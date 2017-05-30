@@ -770,6 +770,24 @@ mrvl_dev_infos_get(struct rte_eth_dev *dev __rte_unused,
 	info->default_rxconf.rx_drop_en = 1;
 }
 
+static void mrvl_rxq_info_get(struct rte_eth_dev *dev, uint16_t rx_queue_id,
+			      struct rte_eth_rxq_info *qinfo)
+{
+	struct mrvl_rxq *q = dev->data->rx_queues[rx_queue_id];
+	struct mrvl_priv *priv = dev->data->dev_private;
+
+	qinfo->mp = q->mp;
+	qinfo->nb_desc = priv->ppio_params.inqs_params.tcs_params[0].inqs_params[rx_queue_id].size;
+}
+
+static void mrvl_txq_info_get(struct rte_eth_dev *dev, uint16_t tx_queue_id,
+			      struct rte_eth_txq_info *qinfo)
+{
+	struct mrvl_priv *priv = dev->data->dev_private;
+
+	qinfo->nb_desc = priv->ppio_params.outqs_params.outqs_params[tx_queue_id].size;
+}
+
 static int
 mrvl_vlan_filter_set(struct rte_eth_dev *dev, uint16_t vlan_id, int on)
 {
@@ -974,8 +992,8 @@ static const struct eth_dev_ops mrvl_ops = {
 	.stats_get = mrvl_stats_get,
 	.stats_reset = mrvl_stats_reset,
 	.dev_infos_get = mrvl_dev_infos_get,
-	.rxq_info_get = NULL,
-	.txq_info_get = NULL,
+	.rxq_info_get = mrvl_rxq_info_get,
+	.txq_info_get = mrvl_txq_info_get,
 	.vlan_filter_set = mrvl_vlan_filter_set,
 	.rx_queue_setup = mrvl_rx_queue_setup,
 	.rx_queue_release = mrvl_rx_queue_release,
