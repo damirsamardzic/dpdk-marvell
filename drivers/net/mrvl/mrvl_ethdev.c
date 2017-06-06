@@ -964,18 +964,18 @@ mrvl_desc_to_ol_flags(struct pp2_ppio_desc *desc)
 {
 	uint64_t flags;
 
-	if (unlikely(DM_RXD_GET_ES(desc)))
+	if (unlikely(pp2_ppio_inq_desc_get_l2_pkt_error(desc) != PP2_DESC_ERR_OK))
 		return 0;
 
-	if (unlikely(DM_RXD_GET_IP_HDR_ERR(desc)))
+	if (unlikely(pp2_ppio_inq_desc_get_l3_pkt_error(desc) != PP2_DESC_ERR_OK))
 		flags = PKT_RX_IP_CKSUM_BAD;
 	else
 		flags = PKT_RX_IP_CKSUM_GOOD;
 
-	if (likely(DM_RXD_GET_L4_CHK_OK(desc)))
-		flags |= PKT_RX_L4_CKSUM_GOOD;
-	else
+	if (unlikely(pp2_ppio_inq_desc_get_l4_pkt_error(desc) != PP2_DESC_ERR_OK))
 		flags |= PKT_RX_L4_CKSUM_BAD;
+	else
+		flags |= PKT_RX_L4_CKSUM_GOOD;
 
 	return flags;
 }
@@ -1166,42 +1166,12 @@ skip:
 static int
 mrvl_init_pp2(void)
 {
-	const char *const cpn_nodes[] = { "cpn-110-master", "cpn-110-slave" };
-	const char *path = "/proc/device-tree/%s/config-space/ppv22@000000/" \
-			   "eth%d@0%d0000/status";
 	struct pp2_init_params init_params;
-	int i, j, ret, len, fd;
-	char buf[256];
 
 	memset(&init_params, 0, sizeof(init_params));
 	init_params.hif_reserved_map = MRVL_MUSDK_HIFS_RESERVED;
 	init_params.bm_pool_reserved_map = MRVL_MUSDK_BPOOLS_RESERVED;
 	init_params.rss_tbl_reserved_map = MRVL_MUSDK_RSS_RESERVED;
-
-	for (i = 0; i < pp2_get_num_inst() && i < RTE_DIM(cpn_nodes); i++) {
-		for (j = 0; j < PP2_NUM_ETH_PPIO; j++) {
-			snprintf(buf, sizeof(buf), path, cpn_nodes[i], j, j + 1);
-
-			fd = open(buf, O_RDONLY);
-			if (fd < 0) {
-				RTE_LOG(WARNING, PMD, "Failed to read %s\n", buf);
-				continue;
-			}
-
-			len = lseek(fd, 0, SEEK_END);
-			lseek(fd, 0, SEEK_SET);
-
-			read(fd, buf, len);
-			buf[len] = '\0';
-
-			if (!strcmp(buf, "non-kernel")) {
-				init_params.ppios[i][j].is_enabled = 1;
-				init_params.ppios[i][j].first_inq = 0;
-			}
-
-			close(fd);
-		}
-	}
 
 	return pp2_init(&init_params);
 }
@@ -1225,7 +1195,7 @@ mrvl_priv_create(const char *dev_name)
 	if (!priv)
 		return NULL;
 
-	ret = pp2_netdev_get_port_info((char *)dev_name, &priv->pp_id, &priv->ppio_id);
+	ret = pp2_netdev_get_ppio_info((char *)dev_name, &priv->pp_id, &priv->ppio_id);
 	if (ret)
 		goto out_free_priv;
 
