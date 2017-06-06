@@ -57,7 +57,6 @@ LDLIBS += -L$(LIBMUSDK_PATH)/lib -lmusdk
 # library source files
 SRCS-$(CONFIG_RTE_LIBRTE_PMD_MRVL_CRYPTO) += rte_mrvl_pmd.c
 SRCS-$(CONFIG_RTE_LIBRTE_PMD_MRVL_CRYPTO) += rte_mrvl_pmd_ops.c
-SRCS-$(CONFIG_RTE_LIBRTE_PMD_MRVL_CRYPTO) += rte_mrvl_hmac.c
 
 # library dependencies
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_MRVL_CRYPTO) += lib/librte_eal

@@ -41,7 +41,6 @@
 #include <rte_cpuflags.h>
 
 #include "rte_mrvl_pmd_private.h"
-#include "rte_mrvl_hmac.h"
 
 /**
  * Flag if particular crypto algorithm is supported by PMD/MUSDK.
@@ -69,8 +68,6 @@ __rte_aligned(32);
 struct auth_params_mapping {
 	enum algo_supported supported;  /**< On/off switch */
 	enum sam_auth_alg   auth_alg;   /**< Auth algorithm */
-	mv_hmac_gen_f       hmac_gen_f;
-	/**< Function pointer for HMAC generator*/
 }
 /* We want to squeeze in multiple maps into the cache line. */
 __rte_aligned(32);
@@ -119,15 +116,13 @@ static const
 struct auth_params_mapping auth_map[RTE_CRYPTO_AUTH_LIST_END] = {
 	[RTE_CRYPTO_AUTH_MD5_HMAC] = {
 		.supported = ALGO_SUPPORTED,
-		.auth_alg = SAM_AUTH_HMAC_MD5,
-		.hmac_gen_f = mrvl_md5_hmac_gen },
+		.auth_alg = SAM_AUTH_HMAC_MD5 },
 	[RTE_CRYPTO_AUTH_MD5] = {
 		.supported = ALGO_SUPPORTED,
 		.auth_alg = SAM_AUTH_HASH_MD5 },
 	[RTE_CRYPTO_AUTH_SHA1_HMAC] = {
 		.supported = ALGO_SUPPORTED,
-		.auth_alg = SAM_AUTH_HMAC_SHA1,
-		.hmac_gen_f = mrvl_sha1_hmac_gen },
+		.auth_alg = SAM_AUTH_HMAC_SHA1 },
 	[RTE_CRYPTO_AUTH_SHA1] = {
 		.supported = ALGO_SUPPORTED,
 		.auth_alg = SAM_AUTH_HASH_SHA1 },
@@ -140,22 +135,19 @@ struct auth_params_mapping auth_map[RTE_CRYPTO_AUTH_LIST_END] = {
 		.auth_alg = SAM_AUTH_HASH_SHA2_224 },
 	[RTE_CRYPTO_AUTH_SHA256_HMAC] = {
 		.supported = ALGO_SUPPORTED,
-		.auth_alg = SAM_AUTH_HMAC_SHA2_256,
-		.hmac_gen_f = mrvl_sha256_hmac_gen },
+		.auth_alg = SAM_AUTH_HMAC_SHA2_256 },
 	[RTE_CRYPTO_AUTH_SHA256] = {
 		.supported = ALGO_SUPPORTED,
 		.auth_alg = SAM_AUTH_HASH_SHA2_256 },
 	[RTE_CRYPTO_AUTH_SHA384_HMAC] = {
 		.supported = ALGO_SUPPORTED,
-		.auth_alg = SAM_AUTH_HMAC_SHA2_384,
-		.hmac_gen_f = mrvl_sha384_hmac_gen },
+		.auth_alg = SAM_AUTH_HMAC_SHA2_384 },
 	[RTE_CRYPTO_AUTH_SHA384] = {
 		.supported = ALGO_SUPPORTED,
 		.auth_alg = SAM_AUTH_HASH_SHA2_384 },
 	[RTE_CRYPTO_AUTH_SHA512_HMAC] = {
 		.supported = ALGO_SUPPORTED,
-		.auth_alg = SAM_AUTH_HMAC_SHA2_512,
-		.hmac_gen_f = mrvl_sha512_hmac_gen },
+		.auth_alg = SAM_AUTH_HMAC_SHA2_512 },
 	[RTE_CRYPTO_AUTH_SHA512] = {
 		.supported = ALGO_SUPPORTED,
 		.auth_alg = SAM_AUTH_HASH_SHA2_512 },
@@ -213,28 +205,6 @@ mrvl_crypto_get_chain_order(const struct rte_crypto_sym_xform *xform)
 }
 
 /**
- * Set prerequisites (IV) for authentication.
- *
- * @param sess Crypto session pointer.
- * @param auth_xform Pointer to configuration structure for auth operations.
- * @returns Status of IV preparation: 0 for success/skipped,
- *          negative value otherwise.
- */
-static inline int
-auth_set_prerequisites(struct mrvl_crypto_session *sess,
-			const struct rte_crypto_sym_xform *auth_xform)
-{
-	if (auth_map[auth_xform->auth.algo].hmac_gen_f == NULL) {
-		/* HMAC not supported */
-		return 0;
-	}
-
-	return auth_map[auth_xform->auth.algo].hmac_gen_f(
-			auth_xform->auth.key.data, auth_xform->auth.key.length,
-			sess->auth_hmac.i_key_pad, sess->auth_hmac.o_key_pad);
-}
-
-/**
  * Set session parameters for cipher part.
  *
  * @param sess Crypto session pointer.
@@ -275,9 +245,7 @@ mrvl_crypto_set_cipher_session_parameters(struct mrvl_crypto_session *sess,
 	}
 
 	sess->sam_sess_params.cipher_key_len = cipher_xform->cipher.key.length;
-	rte_memcpy(sess->key, cipher_xform->cipher.key.data,
-			cipher_xform->cipher.key.length);
-	sess->sam_sess_params.cipher_key = sess->key;
+	sess->sam_sess_params.cipher_key = cipher_xform->cipher.key.data;
 	return 0;
 }
 
@@ -306,11 +274,11 @@ mrvl_crypto_set_auth_session_parameters(struct mrvl_crypto_session *sess,
 
 	sess->sam_sess_params.auth_alg =
 		auth_map[auth_xform->auth.algo].auth_alg;
-	sess->sam_sess_params.auth_aad_len =
+	sess->sam_sess_params.u.basic.auth_aad_len =
 		auth_xform->auth.add_auth_data_length;
-	sess->sam_sess_params.auth_icv_len = auth_xform->auth.digest_length;
-	sess->sam_sess_params.auth_inner = sess->auth_hmac.i_key_pad;
-	sess->sam_sess_params.auth_outer = sess->auth_hmac.o_key_pad;
+	sess->sam_sess_params.u.basic.auth_icv_len = auth_xform->auth.digest_length;
+	sess->sam_sess_params.auth_key = auth_xform->auth.key.data;
+	sess->sam_sess_params.auth_key_len = auth_xform->auth.key.length;
 
 	return 0;
 }
@@ -354,9 +322,8 @@ mrvl_crypto_set_session_parameters(struct mrvl_crypto_session *sess,
 	}
 
 	if ((auth_xform != NULL) &&
-		((mrvl_crypto_set_auth_session_parameters(
-			sess, auth_xform) < 0)
-		|| (auth_set_prerequisites(sess, auth_xform) != 0))) {
+		(mrvl_crypto_set_auth_session_parameters(
+			sess, auth_xform) < 0)) {
 		return -EINVAL;
 	}
 
@@ -445,44 +412,22 @@ mrvl_crypto_prepare_session_parameters(struct rte_cryptodev *dev,
  */
 
 /**
- * Make sure the buffer fits configured size.
- *
- * @param op Pointer to DPDK crypto operation struct.
- * @param qp Pointer to Queue Pair structure.
- * @returns 0 in case of success, negative value otherwise.
- */
-static inline int
-mrvl_check_buffer_constraints(struct rte_crypto_op *op,
-		struct mrvl_crypto_qp *qp)
-{
-	if (op->sym->m_src->buf_len > qp->cio_params.max_buf_size) {
-		MRVL_CRYPTO_LOG_DBG("%d > %d", op->sym->m_src->buf_len,
-				qp->cio_params.max_buf_size);
-		return -1;
-	} else
-		return 0;
-}
-
-/**
  * Make sure the session is started.
  *
  * The function makes sure the session state is correct and session itself
  * is started. If session is not started yet, it tries to start it.
  * @param op Pointer to DPDK crypto operation struct.
- * @param qp Pointer to Queue Pair structure.
  * @returns 0 in case of success, negative value otherwise.
  */
 static inline int
-mrvl_make_sure_session_started(struct rte_crypto_op *op,
-		struct mrvl_crypto_qp *qp)
+mrvl_make_sure_session_started(struct rte_crypto_op *op)
 {
 	struct mrvl_crypto_session *session =
 		(struct mrvl_crypto_session *)op->sym->session->_private;
 
 	if (session->state == MRVL_SESSION_CONFIGURED) {
 		/* Need to start session first */
-		if (sam_session_create(qp->cio,
-				&session->sam_sess_params,
+		if (sam_session_create(&session->sam_sess_params,
 				&session->sam_sess)) {
 			/*
 			 * We're using Dbg here to make sure
@@ -600,10 +545,7 @@ mrvl_crypto_pmd_enqueue_burst(void *queue_pair,
 
 	/* Iterate through */
 	for (; iter_ops < nb_ops; ++iter_ops, ++iter_req) {
-		if ((mrvl_make_sure_session_started(
-				ops[iter_ops], qp) < 0) ||
-			(mrvl_check_buffer_constraints(
-				ops[iter_ops], qp) < 0)) {
+		if (mrvl_make_sure_session_started(ops[iter_ops]) < 0) {
 			MRVL_CRYPTO_LOG_ERR(
 				"Error while parameters preparation!");
 			qp->stats.enqueue_err_count++;
@@ -724,6 +666,7 @@ cryptodev_mrvl_crypto_create(struct rte_crypto_vdev_init_params *init_params)
 {
 	struct rte_cryptodev *dev;
 	struct mrvl_crypto_private *internals;
+	struct sam_init_params	sam_params;
 	int ret;
 
 	if (init_params->name[0] == '\0') {
@@ -768,6 +711,9 @@ cryptodev_mrvl_crypto_create(struct rte_crypto_vdev_init_params *init_params)
 	ret = mv_sys_dma_mem_init(RTE_MRVL_MUSDK_DMA_MEMSIZE);
 	if ((ret < 0) && (ret != -EEXIST))
 		return ret;
+
+	sam_params.max_num_sessions = internals->max_nb_sessions;
+	sam_init(&sam_params);
 
 	return 0;
 

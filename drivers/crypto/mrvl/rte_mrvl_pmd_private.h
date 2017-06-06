@@ -161,21 +161,6 @@ struct mrvl_crypto_session {
 	/** DPDK crypto device pointer.*/
 	struct rte_cryptodev *dev;
 
-	/** Key used for generating HMAC. */
-	uint8_t key[256];
-
-	/** HMAC data. */
-	struct {
-		/** Inner pad (max supported block length). */
-		uint8_t i_key_pad[SHA_BLOCK_MAX] __rte_cache_aligned;
-
-		/** Outer pad (max supported block length). */
-		uint8_t o_key_pad[SHA_BLOCK_MAX] __rte_cache_aligned;
-
-		/** HMAC key (max supported length). */
-		uint8_t key[SHA_AUTH_KEY_MAX];
-	} auth_hmac;
-
 } __rte_cache_aligned;
 
 /** Set and validate the crypto session parameters */

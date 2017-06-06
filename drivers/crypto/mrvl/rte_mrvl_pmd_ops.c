@@ -600,7 +600,6 @@ mrvl_crypto_pmd_qp_setup(struct rte_cryptodev *dev, uint16_t qp_id,
 {
 	struct mrvl_crypto_qp *qp = NULL;
 	unsigned int n;
-	struct mrvl_crypto_private *priv = dev->data->dev_private;
 	uint32_t descriptors = (qp_conf->nb_descriptors > SAM_HW_RING_SIZE) ?
 			SAM_HW_RING_SIZE : qp_conf->nb_descriptors;
 
@@ -625,8 +624,6 @@ mrvl_crypto_pmd_qp_setup(struct rte_cryptodev *dev, uint16_t qp_id,
 
 		qp->cio_params.match = qp->name;
 		qp->cio_params.size = descriptors;
-		qp->cio_params.num_sessions = priv->max_nb_sessions;
-		qp->cio_params.max_buf_size = SAM_SA_DMABUF_SIZE;
 
 		if (sam_cio_init(&qp->cio_params, &qp->cio) < 0)
 			break;

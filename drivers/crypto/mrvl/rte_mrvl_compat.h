@@ -46,9 +46,6 @@
 #include "drivers/mv_sam.h"
 #include "drivers/mv_sam_cio.h"
 #include "drivers/mv_sam_session.h"
-#include "lib/mv_sha1.h"
-#include "lib/mv_sha2.h"
-#include "lib/mv_md5.h"
 
 /* Moved from (inaccessible) src/drivers/sam/sam.h */
 #define SAM_HW_RING_SIZE       256
