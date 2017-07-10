@@ -1237,7 +1237,7 @@ mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 	num -= nb_pkts;
 	if (unlikely(num)) {
 		for (i = nb_pkts; i < num; i++) {
-			addr = cookie_addr_high | sq->infs[i].cookie;
+			addr = cookie_addr_high | pp2_ppio_inq_desc_get_cookie(&descs[i]);
 			bytes_sent -= rte_pktmbuf_pkt_len((struct rte_mbuf *)addr);
 		}
 
