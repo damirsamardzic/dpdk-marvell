@@ -51,6 +51,7 @@ EXPORT_MAP := rte_mrvl_pmd_version.map
 # external library dependencies
 CFLAGS += -I$(LIBMUSDK_PATH)/include
 CFLAGS += -DMVCONF_ARCH_DMA_ADDR_T_64BIT
+CFLAGS += $(WERROR_FLAGS)
 LDLIBS += -L$(LIBMUSDK_PATH)/lib -lmusdk
 
 # library source files

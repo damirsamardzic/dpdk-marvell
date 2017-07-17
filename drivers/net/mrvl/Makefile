@@ -51,6 +51,7 @@ EXPORT_MAP := rte_pmd_mrvl_version.map
 # external library dependencies
 CFLAGS += -I$(LIBMUSDK_PATH)/include -DMVCONF_ARCH_DMA_ADDR_T_64BIT -DCONF_PP2_BPOOL_COOKIE_SIZE=32
 LDLIBS += -L$(LIBMUSDK_PATH)/lib -lmusdk
+CFLAGS += $(WERROR_FLAGS)
 
 # library source files
 SRCS-$(CONFIG_RTE_LIBRTE_MRVL_PMD) += mrvl_ethdev.c
