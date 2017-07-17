@@ -12,3 +12,5 @@ GPATH
 GRTAGS
 tags
 TAGS
+arm64-armv8a-linuxapp-gcc/
+build/

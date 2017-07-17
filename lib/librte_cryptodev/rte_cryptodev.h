@@ -68,6 +68,8 @@ extern "C" {
 /**< KASUMI PMD device name */
 #define CRYPTODEV_NAME_ARMV8_PMD	crypto_armv8
 /**< ARMv8 Crypto PMD device name */
+#define CRYPTODEV_NAME_MRVL_PMD	crypto_mrvl
+/**< Marvell PMD device name */
 #define CRYPTODEV_NAME_SCHEDULER_PMD	crypto_scheduler
 /**< Scheduler Crypto PMD device name */
 #define CRYPTODEV_NAME_DPAA2_SEC_PMD	cryptodev_dpaa2_sec_pmd
@@ -84,6 +86,7 @@ enum rte_cryptodev_type {
 	RTE_CRYPTODEV_ZUC_PMD,		/**< ZUC PMD */
 	RTE_CRYPTODEV_OPENSSL_PMD,    /**<  OpenSSL PMD */
 	RTE_CRYPTODEV_ARMV8_PMD,	/**< ARMv8 crypto PMD */
+	RTE_CRYPTODEV_MRVL_PMD,	/**< ARMv8 crypto PMD */
 	RTE_CRYPTODEV_SCHEDULER_PMD,	/**< Crypto Scheduler PMD */
 	RTE_CRYPTODEV_DPAA2_SEC_PMD,    /**< NXP DPAA2 - SEC PMD */
 };
