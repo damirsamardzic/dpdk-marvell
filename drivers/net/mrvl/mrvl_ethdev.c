@@ -98,7 +98,7 @@
 
 #define MRVL_ARP_LENGTH 28
 
-#define MRVL_COOKIE_ADDR_INVALID ~0LL
+#define MRVL_COOKIE_ADDR_INVALID ~0ULL
 
 static const char *valid_args[] = {
 	MRVL_IFACE_NAME_ARG,
@@ -329,7 +329,6 @@ mrvl_dev_start(struct rte_eth_dev *dev)
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
 	char match[MRVL_MATCH_LEN];
-	uint16_t size;
 	int ret;
 
 	snprintf(match, sizeof(match), "ppio-%d:%d", priv->pp_id, priv->ppio_id);
@@ -408,7 +407,8 @@ static void
 mrvl_flush_bpool(struct rte_eth_dev *dev)
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
-	int ret, num;
+	uint32_t num;
+	int ret;
 
 	ret = pp2_bpool_get_num_buffs(priv->bpool, &num);
 	if (ret) {
@@ -452,7 +452,7 @@ mrvl_dev_close(struct rte_eth_dev *dev)
 }
 
 static int
-mrvl_link_update(struct rte_eth_dev *dev, int wait_to_complete)
+mrvl_link_update(struct rte_eth_dev *dev, int wait_to_complete __rte_unused)
 {
 	/*
 	 * TODO
@@ -570,7 +570,7 @@ mrvl_mac_addr_remove(struct rte_eth_dev *dev, uint32_t index)
 
 static int
 mrvl_mac_addr_add(struct rte_eth_dev *dev, struct ether_addr *mac_addr,
-		  uint32_t index, uint32_t vmdq)
+		  uint32_t index, uint32_t vmdq __rte_unused)
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
 	char buf[ETHER_ADDR_FMT_SIZE];
@@ -621,7 +621,6 @@ mrvl_mac_addr_set(struct rte_eth_dev *dev, struct ether_addr *mac_addr)
 static int
 mrvl_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
 {
-	struct mrvl_priv *priv = dev->data->dev_private;
 	int ret;
 
 	ret = mrvl_update_mru_mtu(dev, mtu);
@@ -740,7 +739,8 @@ mrvl_stats_reset(struct rte_eth_dev *dev)
 }
 
 static void
-mrvl_dev_infos_get(struct rte_eth_dev *dev, struct rte_eth_dev_info *info)
+mrvl_dev_infos_get(struct rte_eth_dev *dev __rte_unused,
+		    struct rte_eth_dev_info *info)
 {
 	info->max_rx_queues = MRVL_PP2_RXQ_MAX;
 	info->max_tx_queues = MRVL_PP2_TXQ_MAX;
@@ -784,7 +784,7 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 {
 	struct buff_release_entry entries[MRVL_PP2_TXD_MAX];
 	struct rte_mbuf *mbufs[MRVL_PP2_TXD_MAX];
-	uint64_t dma_addr, mask = ~0LL << 32;
+	uint64_t mask = ~0LL << 32;
 	int i, ret;
 
 	ret = rte_pktmbuf_alloc_bulk(rxq->mp, mbufs, num);
@@ -797,7 +797,7 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 	for (i = 0; i < num; i++) {
 		if (((uint64_t)mbufs[i] & mask) != cookie_addr_high) {
 			RTE_LOG(ERR, PMD,
-				"mbuf virtual addr high 0x%x out of range\n",
+				"mbuf virtual addr high 0x%lx out of range\n",
 				(uint64_t)mbufs[i] >> 32);
 			ret = -1;
 			goto out;
@@ -831,12 +831,12 @@ out_free:
 
 static int
 mrvl_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
-		    unsigned int socket, const struct rte_eth_rxconf *conf,
+		    unsigned int socket, const struct rte_eth_rxconf *conf __rte_unused,
 		    struct rte_mempool *mp)
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
 	struct mrvl_rxq *rxq;
-	int i, ret;
+	int ret;
 
 	if (dev->data->rx_queues[idx]) {
 		rte_free(dev->data->rx_queues[idx]);
@@ -891,11 +891,10 @@ mrvl_rx_queue_release(void *rxq)
 
 static int
 mrvl_tx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
-		    unsigned int socket, const struct rte_eth_txconf *conf)
+		    unsigned int socket, const struct rte_eth_txconf *conf __rte_unused)
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
 	struct mrvl_txq *txq;
-	int i;
 
 	if (dev->data->tx_queues[idx]) {
 		rte_free(dev->data->tx_queues[idx]);
@@ -1073,7 +1072,8 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 {
 	struct mrvl_rxq *q = rxq;
 	struct pp2_ppio_desc descs[nb_pkts];
-	int i, num, ret, rx_done = 0;
+	int i, ret, rx_done = 0;
+	uint32_t num;
 
 	ret = pp2_ppio_recv(q->priv->ppio, 0, q->queue_id, descs, &nb_pkts);
 	if (ret < 0) {
@@ -1306,20 +1306,21 @@ mrvl_priv_create(const char *dev_name)
 	struct pp2_bpool_params bpool_params;
 	char match[MRVL_MATCH_LEN];
 	struct mrvl_priv *priv;
-	int ret;
+	int ret, bpool_bit;
 
 	priv = rte_zmalloc_socket(dev_name, sizeof(*priv), 0, rte_socket_id());
 	if (!priv)
 		return NULL;
 
-	ret = pp2_netdev_get_ppio_info((char *)dev_name, &priv->pp_id, &priv->ppio_id);
+	ret = pp2_netdev_get_ppio_info((char *)(uintptr_t)dev_name, &priv->pp_id, &priv->ppio_id);
 	if (ret)
 		goto out_free_priv;
 
-	priv->bpool_bit = mrvl_reserve_bit(&used_bpools[priv->pp_id],
-					   PP2_BPOOL_NUM_POOLS);
-	if (priv->bpool_bit < 0)
+	bpool_bit = mrvl_reserve_bit(&used_bpools[priv->pp_id],
+				     PP2_BPOOL_NUM_POOLS);
+	if (bpool_bit < 0)
 		goto out_free_priv;
+	priv->bpool_bit = bpool_bit;
 
 	snprintf(match, sizeof(match), "pool-%d:%d", priv->pp_id, priv->bpool_bit);
 	memset(&bpool_params, 0, sizeof(bpool_params));
@@ -1335,8 +1336,6 @@ mrvl_priv_create(const char *dev_name)
 	priv->ppio_params.inqs_params.tcs_params[0].pools[0] = priv->bpool;
 
 	return priv;
-out_deinit_bpool:
-	pp2_bpool_deinit(priv->bpool);
 out_clear_bpool_bit:
 	used_bpools[priv->pp_id] &= ~(1 << priv->bpool_bit);
 out_free_priv:
@@ -1402,7 +1401,6 @@ mrvl_eth_dev_destroy(const char *name)
 {
 	struct rte_eth_dev *eth_dev;
 	struct mrvl_priv *priv;
-	int i;
 
 	eth_dev = rte_eth_dev_allocated(name);
 	if (!eth_dev)
@@ -1466,7 +1464,8 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 {
 	struct rte_kvargs *kvlist;
 	const char *ifnames[PP2_NUM_ETH_PPIO * PP2_NUM_PKT_PROC];
-	int i, n, ret;
+	int ret = -EINVAL;
+	uint32_t i, n;
 	const char *name;
 	const char *params;
 
@@ -1483,10 +1482,8 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 		return -EINVAL;
 
 	n = rte_kvargs_count(kvlist, MRVL_IFACE_NAME_ARG);
-	if (n > RTE_DIM(ifnames)) {
-		ret = -EINVAL;
+	if (n > RTE_DIM(ifnames))
 		goto out_free_kvlist;
-	}
 
 	rte_kvargs_process(kvlist, MRVL_IFACE_NAME_ARG,
 			   mrvl_get_ifnames, &ifnames);
@@ -1522,7 +1519,6 @@ out_cleanup:
 		mrvl_eth_dev_destroy(ifnames[i]);
 out_deinit_hifs:
 	mrvl_deinit_hifs();
-out_deinit_pp2:
 	mrvl_deinit_pp2();
 out_deinit_dma:
 	mv_sys_dma_mem_destroy();
