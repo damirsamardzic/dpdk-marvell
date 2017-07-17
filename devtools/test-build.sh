@@ -51,6 +51,7 @@ default_path=$PATH
 # - LIBSSO_SNOW3G_PATH
 # - LIBSSO_KASUMI_PATH
 # - LIBSSO_ZUC_PATH
+# - LIBMUSDK_PATH
 . $(dirname $(readlink -e $0))/load-devel-config
 
 print_usage () {
@@ -131,6 +132,7 @@ reset_env ()
 	unset DPDK_DEP_ZLIB
 	unset AESNI_MULTI_BUFFER_LIB_PATH
 	unset ARMV8_CRYPTO_LIB_PATH
+	unset LIBMUSDK_PATH
 	unset LIBSSO_SNOW3G_PATH
 	unset LIBSSO_KASUMI_PATH
 	unset LIBSSO_ZUC_PATH
@@ -180,6 +182,8 @@ config () # <directory> <target> <options>
 		sed -ri               's,(PCAP=)n,\1y,' $1/.config
 		test -z "$ARMV8_CRYPTO_LIB_PATH" || \
 		sed -ri   's,(PMD_ARMV8_CRYPTO=)n,\1y,' $1/.config
+		test -z "$LIBMUSDK_PATH" || \
+		sed -ri   's,(PMD_MRVL_CRYPTO=)n,\1y,' $1/.config
 		test -z "$AESNI_MULTI_BUFFER_LIB_PATH" || \
 		sed -ri       's,(PMD_AESNI_MB=)n,\1y,' $1/.config
 		test "$DPDK_DEP_ISAL_CRYPTO" != y || \
