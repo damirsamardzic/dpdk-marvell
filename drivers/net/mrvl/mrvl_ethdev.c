@@ -91,7 +91,8 @@
 #define MRVL_MATCH_LEN 16
 #define MRVL_PKT_OFFS 64
 #define MRVL_PKT_EFFEC_OFFS (MRVL_PKT_OFFS + PP2_MH_SIZE)
-#define MRVL_VLAN_TAG_SIZE 4
+/* Maximum allowable packet size */
+#define MRVL_PKT_SIZE_MAX (10240 - PP2_MH_SIZE)
 
 #define MRVL_IFACE_NAME_ARG "iface"
 #define MRVL_BURST_SIZE 64
@@ -247,6 +248,10 @@ mrvl_dev_configure(struct rte_eth_dev *dev)
 		return -EINVAL;
 	}
 
+	if (dev->data->dev_conf.rxmode.jumbo_frame)
+		dev->data->mtu = dev->data->dev_conf.rxmode.max_rx_pkt_len -
+				 ETHER_HDR_LEN - ETHER_CRC_LEN;
+
 	inq_params = priv->ppio_params.inqs_params.tcs_params[0].inqs_params;
 	if (inq_params)
 		rte_free(inq_params);
@@ -274,45 +279,42 @@ mrvl_dev_configure(struct rte_eth_dev *dev)
 }
 
 static int
-mrvl_update_mru_mtu(struct rte_eth_dev *dev, uint16_t mtu)
+mrvl_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
-	uint16_t mru, curr_mtu;
+	/* extra PP2_MH_SIZE bytes are required for Marvell tag */
+	uint16_t mru = mtu + PP2_MH_SIZE + ETHER_HDR_LEN + ETHER_CRC_LEN;
 	int ret;
 
-	ret = pp2_ppio_get_mtu(priv->ppio, &curr_mtu);
-	if (ret) {
-		RTE_LOG(ERR, PMD, "Failed to get current mtu\n");
-		return ret;
-	}
-
-	if (curr_mtu == mtu)
-		return 0;
-
-	mru = mtu + PP2_MH_SIZE + ETHER_HDR_LEN + ETHER_CRC_LEN +
-	      MRVL_VLAN_TAG_SIZE;
-
 	ret = pp2_ppio_set_mru(priv->ppio, mru);
-	if (ret) {
-		RTE_LOG(ERR, PMD, "Failed to set mru to %d\n", mru);
+	if (ret)
 		return ret;
-	}
 
-	ret = pp2_ppio_set_mtu(priv->ppio, mtu);
-	if (ret) {
-		RTE_LOG(ERR, PMD, "Failed to set mtu to %d\n", mtu);
-		return ret;
-	}
-
-	return 0;
+	return pp2_ppio_set_mtu(priv->ppio, mtu);
 }
 
 static int
 mrvl_dev_set_link_up(struct rte_eth_dev *dev)
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
+	int ret;
 
-	return pp2_ppio_enable(priv->ppio);
+	ret = pp2_ppio_enable(priv->ppio);
+	if (ret)
+		return ret;
+
+	/*
+	 * mtu/mru can be updated if pp2_ppio_enable() was called at least once
+	 * as pp2_ppio_enable() changes port->t_mode from default 0 to
+	 * PP2_TRAFFIC_INGRESS_EGRESS.
+	 *
+	 * Set mtu to default DPDK value here.
+	 */
+	ret = mrvl_mtu_set(dev, dev->data->mtu);
+	if (ret)
+		pp2_ppio_disable(priv->ppio);
+
+	return ret;
 }
 
 static int
@@ -348,20 +350,19 @@ mrvl_dev_start(struct rte_eth_dev *dev)
 		ret = pp2_ppio_flush_mac_addrs(priv->ppio, 1, 1);
 		if (ret) {
 			RTE_LOG(ERR, PMD, "Failed to flush uc/mc filter list\n");
-
-			return ret;
+			goto out;
 		}
 		priv->uc_mc_flushed = 1;
 	}
 
-	ret = mrvl_update_mru_mtu(dev, dev->data->mtu);
-	if (ret) {
-		pp2_ppio_deinit(priv->ppio);
+	ret = mrvl_dev_set_link_up(dev);
+	if (ret)
+		goto out;
 
-		return ret;
-	}
-
-	return mrvl_dev_set_link_up(dev);
+	return 0;
+out:
+	pp2_ppio_deinit(priv->ppio);
+	return ret;
 }
 
 static void
@@ -618,23 +619,6 @@ mrvl_mac_addr_set(struct rte_eth_dev *dev, struct ether_addr *mac_addr)
 	pp2_ppio_enable(priv->ppio);
 }
 
-static int
-mrvl_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
-{
-	int ret;
-
-	ret = mrvl_update_mru_mtu(dev, mtu);
-	if (ret)
-		return ret;
-
-	if (mtu > ETHER_MAX_LEN)
-		dev->data->dev_conf.rxmode.jumbo_frame = 1;
-	else
-		dev->data->dev_conf.rxmode.jumbo_frame = 0;
-
-	return 0;
-}
-
 static void
 mrvl_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 {
@@ -768,6 +752,8 @@ mrvl_dev_infos_get(struct rte_eth_dev *dev __rte_unused,
 
 	/* By default packets are dropped if no descriptors are available */
 	info->default_rxconf.rx_drop_en = 1;
+
+	info->max_rx_pktlen = MRVL_PKT_SIZE_MAX;
 }
 
 static void mrvl_rxq_info_get(struct rte_eth_dev *dev, uint16_t rx_queue_id,
@@ -1344,7 +1330,7 @@ mrvl_priv_create(const char *dev_name)
 	snprintf(match, sizeof(match), "pool-%d:%d", priv->pp_id, priv->bpool_bit);
 	memset(&bpool_params, 0, sizeof(bpool_params));
 	bpool_params.match = match;
-	bpool_params.buff_len = RTE_MBUF_DEFAULT_BUF_SIZE;
+	bpool_params.buff_len = MRVL_PKT_SIZE_MAX + MRVL_PKT_EFFEC_OFFS;
 	ret = pp2_bpool_init(&bpool_params, &priv->bpool);
 	if (ret)
 		goto out_clear_bpool_bit;
