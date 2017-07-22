@@ -147,6 +147,7 @@ struct mrvl_priv {
 	uint8_t bpool_bit;
 	uint8_t rss_hf_tcp;
 	uint8_t uc_mc_flushed;
+	uint8_t vlan_flushed;
 };
 
 struct mrvl_rxq {
@@ -362,6 +363,19 @@ mrvl_dev_start(struct rte_eth_dev *dev)
 			goto out;
 		}
 		priv->uc_mc_flushed = 1;
+	}
+
+	if (!priv->vlan_flushed) {
+		ret = pp2_ppio_flush_vlan(priv->ppio);
+		if (ret) {
+			RTE_LOG(ERR, PMD, "Failed to flush vlan list\n");
+			/*
+			 * TODO
+			 * once pp2_ppio_flush_vlan() is supported jump to out
+			 * goto out;
+			 */
+		}
+		priv->vlan_flushed = 1;
 	}
 
 	ret = mrvl_dev_set_link_up(dev);
