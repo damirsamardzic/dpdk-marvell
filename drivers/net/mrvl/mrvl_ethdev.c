@@ -462,6 +462,7 @@ mrvl_dev_stop(struct rte_eth_dev *dev)
 	mrvl_flush_rx_queues(dev);
 	mrvl_flush_tx_shadow_queues(dev);
 	pp2_ppio_deinit(priv->ppio);
+	priv->ppio = NULL;
 }
 
 static void
@@ -1090,6 +1091,9 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 	int i, ret, rx_done = 0;
 	uint32_t num;
 
+	if (!q->priv->ppio)
+		return 0;
+
 	ret = pp2_ppio_recv(q->priv->ppio, 0, q->queue_id, descs, &nb_pkts);
 	if (ret < 0) {
 		RTE_LOG(ERR, PMD, "Failed to receive packets\n");
@@ -1195,6 +1199,9 @@ mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 	int i, j, ret, bytes_sent = 0;
 	uint16_t num, nb_done;
 	uint64_t addr;
+
+	if (!q->priv->ppio)
+		return 0;
 
 	for (i = 0; i < nb_pkts; i++) {
 		struct rte_mbuf *mbuf = tx_pkts[i];
