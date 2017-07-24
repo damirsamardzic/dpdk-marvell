@@ -167,6 +167,7 @@ static int kni_change_mtu(uint8_t port_id, unsigned new_mtu);
 static int kni_config_network_interface(uint8_t port_id, uint8_t if_up);
 
 static rte_atomic32_t kni_stop = RTE_ATOMIC32_INIT(0);
+static rte_atomic32_t kni_restart = RTE_ATOMIC32_INIT(0);
 
 /* Print out statistics on packets handled */
 static void
@@ -217,6 +218,22 @@ signal_handler(int signum)
 		rte_atomic32_inc(&kni_stop);
 		return;
         }
+}
+
+static void
+kni_stop_lcores(void)
+{
+	unsigned i;
+
+	rte_atomic32_inc(&kni_restart);
+	rte_atomic32_inc(&kni_stop);
+
+	RTE_LCORE_FOREACH(i) {
+		if (i == rte_lcore_id())
+			continue;
+
+		rte_eal_wait_lcore(i);
+	}
 }
 
 static void
@@ -704,6 +721,7 @@ kni_change_mtu(uint8_t port_id, unsigned new_mtu)
 
 	RTE_LOG(INFO, APP, "Change MTU of port %d to %u\n", port_id, new_mtu);
 
+	kni_stop_lcores();
 	/* Stop specific port */
 	rte_eth_dev_stop(port_id);
 
@@ -746,6 +764,8 @@ kni_config_network_interface(uint8_t port_id, uint8_t if_up)
 
 	RTE_LOG(INFO, APP, "Configure network interface of %d %s\n",
 					port_id, if_up ? "up" : "down");
+
+	kni_stop_lcores();
 
 	if (if_up != 0) { /* Configure network interface up */
 		rte_eth_dev_stop(port_id);
@@ -903,11 +923,17 @@ main(int argc, char** argv)
 	}
 	check_all_ports_link_status(nb_sys_ports, ports_mask);
 
+restart:
 	/* Launch per-lcore function on every lcore */
 	rte_eal_mp_remote_launch(main_loop, NULL, CALL_MASTER);
 	RTE_LCORE_FOREACH_SLAVE(i) {
 		if (rte_eal_wait_lcore(i) < 0)
 			return -1;
+	}
+	if (rte_atomic32_read(&kni_restart)) {
+		rte_atomic32_dec(&kni_stop);
+		rte_atomic32_dec(&kni_restart);
+		goto restart;
 	}
 
 	/* Release resources */
