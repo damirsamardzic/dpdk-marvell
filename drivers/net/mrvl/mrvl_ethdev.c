@@ -58,6 +58,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "mrvl_ethdev.h"
+#include "mrvl_qos.h"
+
 /* bitmask with reserved hifs */
 #define MRVL_MUSDK_HIFS_RESERVED 0x0F
 /* bitmask with reserved bpools */
@@ -66,25 +69,6 @@
 #define MRVL_MUSDK_RSS_RESERVED 0x01
 /* maximum number of available hifs */
 #define MRVL_MUSDK_HIFS_MAX 9
-
-/* maximum number of rx queues per port */
-#define MRVL_PP2_RXQ_MAX 32
-/* maximum number of tx queues per port */
-#define MRVL_PP2_TXQ_MAX 8
-/* minimum number of descriptors in tx queue */
-#define MRVL_PP2_TXD_MIN 16
-/* maximum number of descriptors in tx queue */
-#define MRVL_PP2_TXD_MAX 1024
-/* tx queue descriptors alignment */
-#define MRVL_PP2_TXD_ALIGN 16
-/* minimum number of descriptors in rx queue */
-#define MRVL_PP2_RXD_MIN 16
-/* maximum number of descriptors in rx queue */
-#define MRVL_PP2_RXD_MAX 1024
-/* rx queue descriptors alignment */
-#define MRVL_PP2_RXD_ALIGN 16
-/* maximum number of descriptors in tx aggregated queue */
-#define MRVL_PP2_AGGR_TXQD_MAX 1024
 
 /* TCAM has 25 entries reserved for uc/mc filter entries */
 #define MRVL_MAC_ADDRS_MAX 25
@@ -95,6 +79,8 @@
 #define MRVL_PKT_SIZE_MAX (10240 - PP2_MH_SIZE)
 
 #define MRVL_IFACE_NAME_ARG "iface"
+#define MRVL_CFG_ARG "cfg"
+
 #define MRVL_BURST_SIZE 64
 
 #define MRVL_ARP_LENGTH 28
@@ -103,6 +89,7 @@
 
 static const char *valid_args[] = {
 	MRVL_IFACE_NAME_ARG,
+	MRVL_CFG_ARG,
 	NULL
 };
 
@@ -175,6 +162,9 @@ struct mrvl_txq {
  * we eventually fit somewhere.
  */
 struct mrvl_shadow_txq shadow_txqs[RTE_MAX_ETHPORTS][MRVL_PP2_TXQ_MAX];
+
+/* Number of ports configured. */
+int ports_nb;
 
 static inline int
 mrvl_reserve_bit(int *bitmap, int max)
@@ -1456,13 +1446,13 @@ mrvl_eth_dev_destroy(const char *name)
 static int
 mrvl_get_ifnames(const char *key __rte_unused, const char *value, void *extra_args)
 {
-	static int n;
 	const char **ifnames = extra_args;
 
-	ifnames[n++] = value;
+	ifnames[ports_nb++] = value;
 
 	return 0;
 }
+
 
 static int
 mrvl_init_hifs(void)
@@ -1527,6 +1517,17 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 
 	rte_kvargs_process(kvlist, MRVL_IFACE_NAME_ARG,
 			   mrvl_get_ifnames, &ifnames);
+
+	n = rte_kvargs_count(kvlist, MRVL_CFG_ARG);
+
+	if (n > 1) {
+		RTE_LOG(ERR, PMD, "Cannot handle more than one config file!\n");
+		goto out_free_kvlist;
+	}
+
+	if (n == 1)
+		rte_kvargs_process(kvlist, MRVL_CFG_ARG,
+				mrvl_get_qoscfg, &mrvl_qos_cfg);
 
 	/*
 	 * ret == -EEXIST is correct, it means DMA
