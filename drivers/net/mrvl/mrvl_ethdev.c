@@ -287,6 +287,9 @@ mrvl_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
 	uint16_t mru = mtu + PP2_MH_SIZE + ETHER_HDR_LEN + ETHER_CRC_LEN;
 	int ret;
 
+	if ((mtu < ETHER_MIN_MTU) || (mru > MRVL_PKT_SIZE_MAX))
+		return -EINVAL;
+
 	ret = pp2_ppio_set_mru(priv->ppio, mru);
 	if (ret)
 		return ret;
