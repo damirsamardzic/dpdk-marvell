@@ -861,7 +861,15 @@ mrvl_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
 	struct mrvl_rxq *rxq;
+	uint32_t min_size;
 	int ret;
+
+	min_size = mp->elt_size - sizeof(struct rte_mbuf) -
+		   RTE_PKTMBUF_HEADROOM - MRVL_PKT_EFFEC_OFFS - PP2_MH_SIZE;
+	if (min_size > mp->elt_size) {
+		RTE_LOG(ERR, PMD, "Mempool element is to small\n");
+		return -EINVAL;
+	}
 
 	if (dev->data->rx_queues[idx]) {
 		rte_free(dev->data->rx_queues[idx]);
