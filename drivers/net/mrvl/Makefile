@@ -36,6 +36,9 @@ ifneq ($(MAKECMDGOALS),config)
 ifeq ($(LIBMUSDK_PATH),)
 $(error "Please define LIBMUSDK_PATH environment variable")
 endif
+ifeq ($(CONFIG_RTE_LIBRTE_CFGFILE),n)
+$(error "RTE_LIBRTE_CFGFILE must be enabled in configuration!")
+endif
 endif
 endif
 
@@ -49,13 +52,17 @@ LIBABIVER := 1
 EXPORT_MAP := rte_pmd_mrvl_version.map
 
 # external library dependencies
-CFLAGS += -I$(LIBMUSDK_PATH)/include -DMVCONF_ARCH_DMA_ADDR_T_64BIT -DCONF_PP2_BPOOL_COOKIE_SIZE=32
-LDLIBS += -L$(LIBMUSDK_PATH)/lib -lmusdk
+CFLAGS += -I$(LIBMUSDK_PATH)/include
+CFLAGS += -DMVCONF_ARCH_DMA_ADDR_T_64BIT
+CFLAGS += -DCONF_PP2_BPOOL_COOKIE_SIZE=32
 CFLAGS += $(WERROR_FLAGS)
 CFLAGS += -O3
+LDLIBS += -L$(LIBMUSDK_PATH)/lib
+LDLIBS += -lmusdk
 
 # library source files
 SRCS-$(CONFIG_RTE_LIBRTE_MRVL_PMD) += mrvl_ethdev.c
+SRCS-$(CONFIG_RTE_LIBRTE_MRVL_PMD) += mrvl_qos.c
 
 # library dependencies
 DEPDIRS-$(CONFIG_RTE_LIBRTE_MRVL_PMD) += lib/librte_eal
@@ -64,5 +71,6 @@ DEPDIRS-$(CONFIG_RTE_LIBRTE_MRVL_PMD) += lib/librte_mempool
 DEPDIRS-$(CONFIG_RTE_LIBRTE_MRVL_PMD) += lib/librte_mbuf
 DEPDIRS-$(CONFIG_RTE_LIBRTE_MRVL_PMD) += lib/librte_net
 DEPDIRS-$(CONFIG_RTE_LIBRTE_MRVL_PMD) += lib/librte_kvargs
+DEPDIRS-$(CONFIG_RTE_LIBRTE_MRVL_PMD) += lib/librte_cfgfile
 
 include $(RTE_SDK)/mk/rte.lib.mk
