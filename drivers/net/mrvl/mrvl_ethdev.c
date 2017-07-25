@@ -45,7 +45,6 @@
 #include <drivers/mv_pp2.h>
 #include <drivers/mv_pp2_bpool.h>
 #include <drivers/mv_pp2_hif.h>
-#include <drivers/mv_pp2_ppio.h>
 
 #include <assert.h>
 #include <fcntl.h>
@@ -73,7 +72,6 @@
 /* TCAM has 25 entries reserved for uc/mc filter entries */
 #define MRVL_MAC_ADDRS_MAX 25
 #define MRVL_MATCH_LEN 16
-#define MRVL_PKT_OFFS 64
 #define MRVL_PKT_EFFEC_OFFS (MRVL_PKT_OFFS + PP2_MH_SIZE)
 /* Maximum allowable packet size */
 #define MRVL_PKT_SIZE_MAX (10240 - PP2_MH_SIZE)
@@ -123,20 +121,6 @@ struct mrvl_shadow_txq {
 struct mrvl_rxq;
 struct mrvl_txq;
 
-struct mrvl_priv {
-	struct pp2_bpool *bpool;
-	struct pp2_ppio	*ppio;
-
-	struct pp2_ppio_params ppio_params;
-
-	uint8_t pp_id;
-	uint8_t ppio_id;
-	uint8_t bpool_bit;
-	uint8_t rss_hf_tcp;
-	uint8_t uc_mc_flushed;
-	uint8_t vlan_flushed;
-};
-
 struct mrvl_rxq {
 	struct mrvl_priv *priv;
 	struct rte_mempool *mp;
@@ -163,8 +147,8 @@ struct mrvl_txq {
  */
 struct mrvl_shadow_txq shadow_txqs[RTE_MAX_ETHPORTS][MRVL_PP2_TXQ_MAX];
 
-/* Number of ports configured. */
-int ports_nb;
+/** Number of ports configured. */
+int mrvl_ports_nb;
 
 static inline int
 mrvl_reserve_bit(int *bitmap, int max)
@@ -205,7 +189,7 @@ static int
 mrvl_dev_configure(struct rte_eth_dev *dev)
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
-	struct pp2_ppio_inq_params *inq_params;
+	int ret;
 
 	if (dev->data->dev_conf.rxmode.mq_mode != ETH_MQ_RX_NONE &&
 	    dev->data->dev_conf.rxmode.mq_mode != ETH_MQ_RX_RSS) {
@@ -243,18 +227,11 @@ mrvl_dev_configure(struct rte_eth_dev *dev)
 		dev->data->mtu = dev->data->dev_conf.rxmode.max_rx_pkt_len -
 				 ETHER_HDR_LEN - ETHER_CRC_LEN;
 
-	inq_params = priv->ppio_params.inqs_params.tcs_params[0].inqs_params;
-	if (inq_params)
-		rte_free(inq_params);
+	ret = mrvl_configure_rxqs(priv, dev->data->nb_rx_queues);
+	if (ret < 0)
+		return ret;
 
-	inq_params = rte_zmalloc_socket("inq_params",
-				dev->data->nb_rx_queues * sizeof(*inq_params),
-				0, rte_socket_id());
-	if (!inq_params)
-		return -ENOMEM;
 
-	priv->ppio_params.inqs_params.tcs_params[0].num_in_qs = dev->data->nb_rx_queues;
-	priv->ppio_params.inqs_params.tcs_params[0].inqs_params = inq_params;
 	priv->ppio_params.outqs_params.num_outqs = dev->data->nb_tx_queues;
 	priv->ppio_params.maintain_stats = 1;
 
@@ -371,6 +348,12 @@ mrvl_dev_start(struct rte_eth_dev *dev)
 		priv->vlan_flushed = 1;
 	}
 
+	ret = mrvl_start_qos_mapping(priv);
+	if (ret) {
+		pp2_ppio_deinit(priv->ppio);
+		return ret;
+	}
+
 	ret = mrvl_dev_set_link_up(dev);
 	if (ret)
 		goto out;
@@ -395,7 +378,9 @@ mrvl_flush_rx_queues(struct rte_eth_dev *dev)
 			struct pp2_ppio_desc descs[MRVL_PP2_RXD_MAX];
 
 			num = MRVL_PP2_RXD_MAX;
-			ret = pp2_ppio_recv(q->priv->ppio, 0, q->queue_id,
+			ret = pp2_ppio_recv(q->priv->ppio,
+					    q->priv->rxq_map[q->queue_id].tc,
+					    q->priv->rxq_map[q->queue_id].inq,
 					    descs, (uint16_t *)&num);
 		} while (ret == 0 && num);
 	}
@@ -454,6 +439,7 @@ mrvl_dev_stop(struct rte_eth_dev *dev)
 	mrvl_dev_set_link_down(dev);
 	mrvl_flush_rx_queues(dev);
 	mrvl_flush_tx_shadow_queues(dev);
+	pp2_cls_qos_tbl_deinit(priv->qos_tbl);
 	pp2_ppio_deinit(priv->ppio);
 	priv->ppio = NULL;
 }
@@ -462,9 +448,16 @@ static void
 mrvl_dev_close(struct rte_eth_dev *dev)
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
+	size_t i;
 
-	if (priv->ppio_params.inqs_params.tcs_params[0].inqs_params)
-		rte_free(priv->ppio_params.inqs_params.tcs_params[0].inqs_params);
+	for (i = 0; i < priv->ppio_params.inqs_params.num_tcs; ++i)
+		if (priv->ppio_params.inqs_params.tcs_params[i].inqs_params) {
+
+			rte_free(priv->ppio_params.inqs_params.
+				tcs_params[i].inqs_params);
+			priv->ppio_params.inqs_params.
+				tcs_params[i].inqs_params = NULL;
+		}
 
 	mrvl_flush_bpool(dev);
 }
@@ -854,6 +847,13 @@ mrvl_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
 	uint32_t min_size;
 	int ret;
 
+	if (priv->rxq_map[idx].tc == MRVL_UNKNOWN_TC) {
+		/* Unknown TC mapping, mapping will not have a correct queue. */
+		RTE_LOG(ERR, PMD, "Unknown TC mapping for queue %hu port %hhu",
+				idx, priv->ppio_id);
+		return -EFAULT;
+	}
+
 	min_size = mp->elt_size - sizeof(struct rte_mbuf) -
 		   RTE_PKTMBUF_HEADROOM - MRVL_PKT_EFFEC_OFFS - PP2_MH_SIZE;
 	if (min_size > mp->elt_size) {
@@ -877,7 +877,9 @@ mrvl_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
 	rxq->port_id = dev->data->port_id;
 	mrvl_port_to_bpool_lookup[rxq->port_id] = priv->bpool;
 
-	priv->ppio_params.inqs_params.tcs_params[0].inqs_params[idx].size = desc;
+	priv->ppio_params.inqs_params.
+		tcs_params[priv->rxq_map[rxq->queue_id].tc].
+		inqs_params[priv->rxq_map[rxq->queue_id].inq].size = desc;
 
 	ret = mrvl_fill_bpool(rxq, desc);
 	if (ret) {
@@ -899,7 +901,9 @@ mrvl_rx_queue_release(void *rxq)
 	if (!q)
 		return;
 
-	num = q->priv->ppio_params.inqs_params.tcs_params[0].inqs_params[q->queue_id].size;
+	num = q->priv->ppio_params.inqs_params.
+			tcs_params[q->priv->rxq_map[q->queue_id].tc].
+			inqs_params[q->priv->rxq_map[q->queue_id].inq].size;
 	for (i = 0; i < num; i++) {
 		struct pp2_buff_inf inf;
 		uint64_t addr;
@@ -1095,7 +1099,11 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 	if (!q->priv->ppio)
 		return 0;
 
-	ret = pp2_ppio_recv(q->priv->ppio, 0, q->queue_id, descs, &nb_pkts);
+	ret = pp2_ppio_recv(q->priv->ppio,
+			q->priv->rxq_map[q->queue_id].tc,
+			q->priv->rxq_map[q->queue_id].inq,
+			descs,
+			&nb_pkts);
 	if (ret < 0) {
 		RTE_LOG(ERR, PMD, "Failed to receive packets\n");
 		return 0;
@@ -1361,9 +1369,6 @@ mrvl_priv_create(const char *dev_name)
 		goto out_clear_bpool_bit;
 
 	priv->ppio_params.type = PP2_PPIO_T_NIC;
-	priv->ppio_params.inqs_params.num_tcs = 1;
-	priv->ppio_params.inqs_params.tcs_params[0].pkt_offset = MRVL_PKT_OFFS;
-	priv->ppio_params.inqs_params.tcs_params[0].pools[0] = priv->bpool;
 
 	return priv;
 out_clear_bpool_bit:
@@ -1448,11 +1453,10 @@ mrvl_get_ifnames(const char *key __rte_unused, const char *value, void *extra_ar
 {
 	const char **ifnames = extra_args;
 
-	ifnames[ports_nb++] = value;
+	ifnames[mrvl_ports_nb++] = value;
 
 	return 0;
 }
-
 
 static int
 mrvl_init_hifs(void)
@@ -1495,7 +1499,7 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 	struct rte_kvargs *kvlist;
 	const char *ifnames[PP2_NUM_ETH_PPIO * PP2_NUM_PKT_PROC];
 	int ret = -EINVAL;
-	uint32_t i, n;
+	uint32_t i, ifnum, cfgnum;
 	const char *name;
 	const char *params;
 
@@ -1511,21 +1515,18 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 	if (!kvlist)
 		return -EINVAL;
 
-	n = rte_kvargs_count(kvlist, MRVL_IFACE_NAME_ARG);
-	if (n > RTE_DIM(ifnames))
+	ifnum = rte_kvargs_count(kvlist, MRVL_IFACE_NAME_ARG);
+	if (ifnum > RTE_DIM(ifnames))
 		goto out_free_kvlist;
 
 	rte_kvargs_process(kvlist, MRVL_IFACE_NAME_ARG,
 			   mrvl_get_ifnames, &ifnames);
 
-	n = rte_kvargs_count(kvlist, MRVL_CFG_ARG);
-
-	if (n > 1) {
+	cfgnum = rte_kvargs_count(kvlist, MRVL_CFG_ARG);
+	if (cfgnum > 1) {
 		RTE_LOG(ERR, PMD, "Cannot handle more than one config file!\n");
 		goto out_free_kvlist;
-	}
-
-	if (n == 1)
+	} else if (cfgnum == 1)
 		rte_kvargs_process(kvlist, MRVL_CFG_ARG,
 				mrvl_get_qoscfg, &mrvl_qos_cfg);
 
@@ -1545,7 +1546,7 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 	if (ret)
 		goto out_deinit_hifs;
 
-	for (i = 0; i < n; i++) {
+	for (i = 0; i < ifnum; i++) {
 		RTE_LOG(INFO, PMD, "Creating %s\n", ifnames[i]);
 		ret = mrvl_eth_dev_create(name, ifnames[i]);
 		if (ret)

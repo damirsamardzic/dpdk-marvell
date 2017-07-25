@@ -31,29 +31,71 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MRVL_ETHDEV_H_
-#define MRVL_ETHDEV_H_
+#ifndef _MRVL_ETHDEV_H_
+#define _MRVL_ETHDEV_H_
 
-/* maximum number of rx queues per port */
+#include <drivers/mv_pp2_cls.h>
+#include <drivers/mv_pp2_ppio.h>
+
+
+/** Maximum number of rx queues per port */
 #define MRVL_PP2_RXQ_MAX 32
-/* maximum number of tx queues per port */
+
+/** Maximum number of tx queues per port */
 #define MRVL_PP2_TXQ_MAX 8
-/* minimum number of descriptors in tx queue */
+
+/** Minimum number of descriptors in tx queue */
 #define MRVL_PP2_TXD_MIN 16
-/* maximum number of descriptors in tx queue */
+
+/** Maximum number of descriptors in tx queue */
 #define MRVL_PP2_TXD_MAX 1024
-/* tx queue descriptors alignment */
+
+/** Tx queue descriptors alignment */
 #define MRVL_PP2_TXD_ALIGN 16
-/* minimum number of descriptors in rx queue */
+
+/** Minimum number of descriptors in rx queue */
 #define MRVL_PP2_RXD_MIN 16
-/* maximum number of descriptors in rx queue */
+
+/** Maximum number of descriptors in rx queue */
 #define MRVL_PP2_RXD_MAX 1024
-/* rx queue descriptors alignment */
+
+/** Rx queue descriptors alignment */
 #define MRVL_PP2_RXD_ALIGN 16
-/* maximum number of descriptors in tx aggregated queue */
+
+/** Maximum number of descriptors in tx aggregated queue */
 #define MRVL_PP2_AGGR_TXQD_MAX 1024
 
-/* Number of ports configured. */
-extern int ports_nb;
+/** Maximum number of Traffic Classes. */
+#define MRVL_PP2_TC_MAX 8
 
-#endif /* MRVL_ETHDEV_H_ */
+/** Packet offset inside RX buffer. */
+#define MRVL_PKT_OFFS 64
+
+struct mrvl_priv {
+	/* Hot fields, used in fast path. */
+	struct pp2_bpool *bpool; /**< BPool pointer */
+	struct pp2_ppio	*ppio;   /**< Port handler pointer */
+
+	/** Mapping for DPDK rx queue->(TC, MRVL relative inq) */
+	struct {
+		uint8_t tc;  /**< Traffic Class */
+		uint8_t inq; /**< Relative in-queue number */
+	} rxq_map[MRVL_PP2_RXQ_MAX] __rte_cache_aligned;
+
+	/* Configuration data, used sporadically. */
+	uint8_t pp_id;
+	uint8_t ppio_id;
+	uint8_t bpool_bit;
+	uint8_t rss_hf_tcp;
+	uint8_t uc_mc_flushed;
+	uint8_t vlan_flushed;
+
+	struct pp2_ppio_params ppio_params;
+	struct pp2_cls_qos_tbl_params qos_tbl_params;
+	struct pp2_cls_tbl *qos_tbl;
+};
+
+/** Number of ports configured. */
+extern int mrvl_ports_nb;
+
+#endif /* _MRVL_ETHDEV_H_ */

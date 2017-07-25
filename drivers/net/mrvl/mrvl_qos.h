@@ -30,16 +30,19 @@
  *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef MRVL_QOS_H_
-#define MRVL_QOS_H_
+#ifndef _MRVL_QOS_H_
+#define _MRVL_QOS_H_
 
 #include <rte_common.h>
 #include <rte_config.h>
 
 #include "mrvl_ethdev.h"
 
-#define MRVL_PP2_TC_MAX 8
-#define MRVL_CP_PER_TC 8
+/** Code Points per Traffic Class. Equals max(DSCP, PCP). */
+#define MRVL_CP_PER_TC (64)
+
+/** Value used as "unknown". */
+#define MRVL_UNKNOWN_TC (0xFF)
 
 /* stubs */
 enum pp2_ppio_outqs_sched_mode_stub {
@@ -56,7 +59,7 @@ struct pp2_ppio_rate_limit_params {
 
 /* QoS config. */
 struct mrvl_qos_cfg {
-	struct {
+	struct port_cfg {
 		struct pp2_ppio_rate_limit_params rate_limit_params;
 		struct {
 			uint8_t inq[MRVL_PP2_RXQ_MAX];
@@ -74,16 +77,51 @@ struct mrvl_qos_cfg {
 		} outq[MRVL_PP2_RXQ_MAX];
 		uint16_t inqs;
 		uint16_t outqs;
+		uint8_t default_tc;
+		uint8_t use_global_defaults;
 
 	} port[RTE_MAX_ETHPORTS];
 };
 
-/* Global QoS configuration. */
+/** Global QoS configuration. */
 extern struct mrvl_qos_cfg *mrvl_qos_cfg;
 
-
+/**
+ * Parse QoS configuration - rte_kvargs_process handler.
+ *
+ * Opens configuration file and parses its content.
+ *
+ * @param key Unused.
+ * @param path Path to config file.
+ * @param extra_args Pointer to configuration structure.
+ * @returns 0 in case of success, exits otherwise.
+ */
 int
 mrvl_get_qoscfg(const char *key __rte_unused, const char *path,
 		void *extra_args);
 
-#endif /* MRVL_QOS_H_ */
+/**
+ * Configure RX Queues in a given port.
+ *
+ * Sets up RX queues, their Traffic Classes and DPDK rxq->(TC,inq) mapping.
+ *
+ * @param priv Port's private data
+ * @param max_queues Maximum number of queues to configure.
+ * @returns 0 in case of success, negative value otherwise.
+ */
+int
+mrvl_configure_rxqs(struct mrvl_priv *priv, uint16_t max_queues);
+
+/**
+ * Start QoS mapping.
+ *
+ * Finalize QoS table configuration and initialize it in SDK. It can be done
+ * only after port is started, so we have a valid ppio reference.
+ *
+ * @param priv Port's private (configuration) data.
+ * @returns 0 in case of success, exits otherwise.
+ */
+int
+mrvl_start_qos_mapping(struct mrvl_priv *priv);
+
+#endif /* _MRVL_QOS_H_ */
