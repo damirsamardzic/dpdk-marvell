@@ -1028,7 +1028,8 @@ static const struct blockcipher_test_case aes_chain_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_MB |
 			BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CTR HMAC-SHA1 Decryption Digest "
@@ -1038,7 +1039,8 @@ static const struct blockcipher_test_case aes_chain_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_MB |
 			BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-192-CTR XCBC Encryption Digest",
@@ -1074,7 +1076,8 @@ static const struct blockcipher_test_case aes_chain_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_MB |
 			BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-256-CTR HMAC-SHA1 Decryption Digest "
@@ -1084,7 +1087,8 @@ static const struct blockcipher_test_case aes_chain_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_MB |
 			BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA1 Encryption Digest",
@@ -1094,14 +1098,16 @@ static const struct blockcipher_test_case aes_chain_test_cases[] = {
 			BLOCKCIPHER_TEST_TARGET_PMD_MB |
 			BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA1 Encryption Digest "
 			"(short buffers)",
 		.test_data = &aes_test_data_13,
 		.op_mask = BLOCKCIPHER_TEST_OP_ENC_AUTH_GEN,
-		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_ARMV8
+		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_ARMV8 |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA1 Encryption Digest "
@@ -1124,14 +1130,16 @@ static const struct blockcipher_test_case aes_chain_test_cases[] = {
 			BLOCKCIPHER_TEST_TARGET_PMD_MB |
 			BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA1 Decryption Digest "
 			"Verify (short buffers)",
 		.test_data = &aes_test_data_13,
 		.op_mask = BLOCKCIPHER_TEST_OP_AUTH_VERIFY_DEC,
-		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_ARMV8
+		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_ARMV8 |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA256 Encryption Digest",
@@ -1141,14 +1149,16 @@ static const struct blockcipher_test_case aes_chain_test_cases[] = {
 			BLOCKCIPHER_TEST_TARGET_PMD_MB |
 			BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA256 Encryption Digest "
 			"(short buffers)",
 		.test_data = &aes_test_data_12,
 		.op_mask = BLOCKCIPHER_TEST_OP_ENC_AUTH_GEN,
-		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_ARMV8
+		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_ARMV8 |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA256 Decryption Digest "
@@ -1159,14 +1169,16 @@ static const struct blockcipher_test_case aes_chain_test_cases[] = {
 			BLOCKCIPHER_TEST_TARGET_PMD_MB |
 			BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA256 Decryption Digest "
 			"Verify (short buffers)",
 		.test_data = &aes_test_data_12,
 		.op_mask = BLOCKCIPHER_TEST_OP_AUTH_VERIFY_DEC,
-		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_ARMV8
+		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_ARMV8 |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA512 Encryption Digest",
@@ -1175,7 +1187,8 @@ static const struct blockcipher_test_case aes_chain_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_MB |
 			BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA512 Encryption Digest "
@@ -1205,7 +1218,8 @@ static const struct blockcipher_test_case aes_chain_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_MB |
 			BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA512 Decryption Digest "
@@ -1281,7 +1295,8 @@ static const struct blockcipher_test_case aes_chain_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_MB |
 			BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA384 Decryption Digest "
@@ -1291,7 +1306,8 @@ static const struct blockcipher_test_case aes_chain_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_MB |
 			BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC HMAC-SHA1 Encryption Digest "
@@ -1322,7 +1338,8 @@ static const struct blockcipher_test_case aes_cipheronly_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
 			BLOCKCIPHER_TEST_TARGET_PMD_MB |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CBC Decryption",
@@ -1331,7 +1348,8 @@ static const struct blockcipher_test_case aes_cipheronly_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
 			BLOCKCIPHER_TEST_TARGET_PMD_MB |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-192-CBC Encryption",
@@ -1366,7 +1384,8 @@ static const struct blockcipher_test_case aes_cipheronly_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
 			BLOCKCIPHER_TEST_TARGET_PMD_MB |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-256-CBC Decryption",
@@ -1375,7 +1394,8 @@ static const struct blockcipher_test_case aes_cipheronly_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
 			BLOCKCIPHER_TEST_TARGET_PMD_MB |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-256-CBC OOP Encryption",
@@ -1400,7 +1420,8 @@ static const struct blockcipher_test_case aes_cipheronly_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
 			BLOCKCIPHER_TEST_TARGET_PMD_MB |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-128-CTR Decryption",
@@ -1409,7 +1430,8 @@ static const struct blockcipher_test_case aes_cipheronly_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
 			BLOCKCIPHER_TEST_TARGET_PMD_MB |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-192-CTR Encryption",
@@ -1436,7 +1458,8 @@ static const struct blockcipher_test_case aes_cipheronly_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
 			BLOCKCIPHER_TEST_TARGET_PMD_MB |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 	{
 		.test_descr = "AES-256-CTR Decryption",
@@ -1445,7 +1468,8 @@ static const struct blockcipher_test_case aes_cipheronly_test_cases[] = {
 		.pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_OPENSSL |
 			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
 			BLOCKCIPHER_TEST_TARGET_PMD_MB |
-			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER
+			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
 	},
 };
 
