@@ -102,7 +102,8 @@ test_blockcipher_one_case(const struct blockcipher_test_case *t,
 	switch (cryptodev_type) {
 	case RTE_CRYPTODEV_QAT_SYM_PMD:
 	case RTE_CRYPTODEV_OPENSSL_PMD:
-	case RTE_CRYPTODEV_ARMV8_PMD: /* Fall through */
+	case RTE_CRYPTODEV_ARMV8_PMD:
+	case RTE_CRYPTODEV_MRVL_PMD: /* Fall through */
 		digest_len = tdata->digest.len;
 		break;
 	case RTE_CRYPTODEV_AESNI_MB_PMD:
@@ -666,6 +667,9 @@ test_blockcipher_all_tests(struct rte_mempool *mbuf_pool,
 	case RTE_CRYPTODEV_DPAA2_SEC_PMD:
 		target_pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_DPAA2_SEC;
 		break;
+	case RTE_CRYPTODEV_MRVL_PMD:
+		target_pmd_mask = BLOCKCIPHER_TEST_TARGET_PMD_MRVL;
+		break;
 	default:
 		TEST_ASSERT(0, "Unrecognized cryptodev type");
 		break;
@@ -677,11 +681,14 @@ test_blockcipher_all_tests(struct rte_mempool *mbuf_pool,
 		if (!(tc->pmd_mask & target_pmd_mask))
 			continue;
 
+		printf("  %u) TestCase %s: ", test_index ++,
+			tc->test_descr);
+		fflush(stdout);
+
 		status = test_blockcipher_one_case(tc, mbuf_pool, op_mpool,
 			dev_id, cryptodev_type, test_msg);
 
-		printf("  %u) TestCase %s %s\n", test_index ++,
-			tc->test_descr, test_msg);
+		printf(" [%s]\n", test_msg);
 
 		if (status != TEST_SUCCESS) {
 			if (overall_status == TEST_SUCCESS)
