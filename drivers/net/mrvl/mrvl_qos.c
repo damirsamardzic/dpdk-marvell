@@ -735,6 +735,6 @@ mrvl_start_qos_mapping(struct mrvl_priv *priv)
 		priv->qos_tbl_params.dscp_cos_map[i].ppio = priv->ppio;
 
 	/* Initialize Classifier QoS table. */
-	pp2_cls_qos_tbl_init(&priv->qos_tbl_params, &priv->qos_tbl);
-	return 0;
+
+	return pp2_cls_qos_tbl_init(&priv->qos_tbl_params, &priv->qos_tbl);
 }

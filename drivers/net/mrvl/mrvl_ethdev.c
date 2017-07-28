@@ -645,7 +645,9 @@ mrvl_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 			continue;
 		}
 
-		ret = pp2_ppio_inq_get_statistics(priv->ppio, 0, idx, &rx_stats, 0);
+		ret = pp2_ppio_inq_get_statistics(priv->ppio,
+			priv->rxq_map[idx].tc, priv->rxq_map[idx].inq,
+			&rx_stats, 0);
 		if (unlikely(ret)) {
 			RTE_LOG(ERR, PMD, "Failed to update rx queue %d stats\n", idx);
 			break;
@@ -711,7 +713,8 @@ mrvl_stats_reset(struct rte_eth_dev *dev)
 	for (i = 0; i < dev->data->nb_rx_queues; i++) {
 		struct mrvl_rxq *rxq = dev->data->rx_queues[i];
 
-		pp2_ppio_inq_get_statistics(priv->ppio, 0, i, NULL, 1);
+		pp2_ppio_inq_get_statistics(priv->ppio,
+			priv->rxq_map[i].tc, priv->rxq_map[i].inq, NULL, 1);
 		rxq->bytes_recv = 0;
 		rxq->drop_mac = 0;
 	}
