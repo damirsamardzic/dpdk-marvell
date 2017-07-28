@@ -760,6 +760,24 @@ mrvl_dev_infos_get(struct rte_eth_dev *dev __rte_unused,
 	info->max_rx_pktlen = MRVL_PKT_SIZE_MAX;
 }
 
+static const uint32_t *
+mrvl_dev_supported_ptypes_get(struct rte_eth_dev *dev __rte_unused)
+{
+	static const uint32_t ptypes[] = {
+		RTE_PTYPE_L2_ETHER,
+		RTE_PTYPE_L3_IPV4,
+		RTE_PTYPE_L3_IPV4_EXT,
+		RTE_PTYPE_L3_IPV4_EXT_UNKNOWN,
+		RTE_PTYPE_L3_IPV6,
+		RTE_PTYPE_L3_IPV6_EXT,
+		RTE_PTYPE_L2_ETHER_ARP,
+		RTE_PTYPE_L4_TCP,
+		RTE_PTYPE_L4_UDP
+	};
+
+	return ptypes;
+}
+
 static void mrvl_rxq_info_get(struct rte_eth_dev *dev, uint16_t rx_queue_id,
 			      struct rte_eth_rxq_info *qinfo)
 {
@@ -1001,6 +1019,7 @@ static const struct eth_dev_ops mrvl_ops = {
 	.stats_get = mrvl_stats_get,
 	.stats_reset = mrvl_stats_reset,
 	.dev_infos_get = mrvl_dev_infos_get,
+	.dev_supported_ptypes_get = mrvl_dev_supported_ptypes_get,
 	.rxq_info_get = mrvl_rxq_info_get,
 	.txq_info_get = mrvl_txq_info_get,
 	.vlan_filter_set = mrvl_vlan_filter_set,
