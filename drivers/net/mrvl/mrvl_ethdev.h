@@ -48,7 +48,7 @@
 #define MRVL_PP2_TXD_MIN 16
 
 /** Maximum number of descriptors in tx queue */
-#define MRVL_PP2_TXD_MAX 1024
+#define MRVL_PP2_TXD_MAX 2048
 
 /** Tx queue descriptors alignment */
 #define MRVL_PP2_TXD_ALIGN 16
@@ -57,13 +57,13 @@
 #define MRVL_PP2_RXD_MIN 16
 
 /** Maximum number of descriptors in rx queue */
-#define MRVL_PP2_RXD_MAX 1024
+#define MRVL_PP2_RXD_MAX 2048
 
 /** Rx queue descriptors alignment */
 #define MRVL_PP2_RXD_ALIGN 16
 
 /** Maximum number of descriptors in tx aggregated queue */
-#define MRVL_PP2_AGGR_TXQD_MAX 1024
+#define MRVL_PP2_AGGR_TXQD_MAX 2048
 
 /** Maximum number of Traffic Classes. */
 #define MRVL_PP2_TC_MAX 8
