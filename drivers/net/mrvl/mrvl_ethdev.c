@@ -113,9 +113,11 @@ uint64_t cookie_addr_high = MRVL_COOKIE_ADDR_INVALID;
  * 0xff then its released to software mempool.
  */
 struct mrvl_shadow_txq {
-	int head;
-	int tail;
-	struct pp2_buff_inf infs[MRVL_PP2_TXD_MAX];
+	int head;			/* write index - used when sending buffers */
+	int tail;			/* read index - used when releasing buffers */
+	u16 size;			/* queue occupied size */
+	u16 num_to_release;		/* number of buffers sent, that can be released */
+	struct buff_release_entry ent[MRVL_PP2_TX_SHADOWQ_SIZE]; /* queue entries */
 };
 
 struct mrvl_rxq;
@@ -400,9 +402,9 @@ mrvl_flush_tx_shadow_queues(struct rte_eth_dev *dev)
 		struct mrvl_shadow_txq *sq = &shadow_txqs[dev->data->port_id][i];
 
 		while (sq->tail != sq->head) {
-			uint64_t addr = cookie_addr_high | sq->infs[sq->tail].cookie;
+			uint64_t addr = cookie_addr_high | sq->ent[sq->tail].buff.cookie;
 			rte_pktmbuf_free((struct rte_mbuf *)addr);
-			sq->tail = (sq->tail + 1) % RTE_DIM(sq->infs);
+			sq->tail = (sq->tail + 1) & MRVL_PP2_TX_SHADOWQ_MASK;
 		}
 
 		memset(sq, 0, sizeof(*sq));
@@ -819,6 +821,7 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 	struct rte_mbuf *mbufs[MRVL_PP2_TXD_MAX];
 	uint64_t mask = ~0LL << 32;
 	int i, ret;
+	struct pp2_hif *hif = hifs[rte_lcore_id()];
 
 	ret = rte_pktmbuf_alloc_bulk(rxq->mp, mbufs, num);
 	if (ret)
@@ -841,7 +844,7 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 		entries[i].bpool = rxq->priv->bpool;
 	}
 
-	ret = pp2_bpool_put_buffs(hifs[rte_lcore_id()], entries, (uint16_t *)&i);
+	ret = pp2_bpool_put_buffs(hif, entries, (uint16_t *)&i);
 	if (ret)
 		goto out_free;
 	if (i != num) {
@@ -853,7 +856,7 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 out:
 	for (; i > 0; i--) {
 		struct pp2_buff_inf inf;
-		pp2_bpool_get_buff(hifs[rte_lcore_id()], rxq->priv->bpool, &inf);
+		pp2_bpool_get_buff(hif, rxq->priv->bpool, &inf);
 	}
 out_free:
 	for (i = 0; i < num; i++)
@@ -1224,19 +1227,80 @@ mrvl_prepare_proto_info(uint64_t ol_flags, uint32_t packet_type,
 	return 0;
 }
 
+static inline void
+mrvl_free_sent_buffers(struct pp2_ppio *ppio, struct pp2_hif *hif,
+			struct mrvl_shadow_txq *sq, int qid, int force)
+{
+	uint16_t nb_done = 0, num = 0, skip_bufs = 0;
+	int i;
+
+	pp2_ppio_get_num_outq_done(ppio, hif, qid, &nb_done);
+
+	sq->num_to_release += nb_done;
+
+	if (likely(!force && (sq->num_to_release < MRVL_PP2_BUF_RELEASE_BURST_SIZE)))
+		return;
+
+	nb_done = sq->num_to_release;
+	sq->num_to_release = 0;
+
+	for (i = 0, num = 0; i < nb_done; i++) {
+		struct rte_mbuf *mbuf;
+
+		mbuf = (struct rte_mbuf *)(cookie_addr_high | sq->ent[sq->tail + num].buff.cookie);
+		if (unlikely(mbuf->port == 0xff || mbuf->refcnt > 1)) {
+			rte_pktmbuf_free(mbuf);
+			skip_bufs = 1;
+			goto skip;
+		}
+		sq->ent[sq->tail + num].bpool = mrvl_port_to_bpool_lookup[mbuf->port];
+		rte_pktmbuf_reset(mbuf);
+		num++;
+
+		if (unlikely(sq->tail + num == MRVL_PP2_TX_SHADOWQ_SIZE))
+			goto skip;
+		continue;
+skip:
+		if (likely(num)) {
+			pp2_bpool_put_buffs(hif, &sq->ent[sq->tail], &num);
+			num += skip_bufs;
+			sq->tail = (sq->tail + num) & MRVL_PP2_TX_SHADOWQ_MASK;
+			sq->size -= num;
+			num = 0;
+		}
+	}
+
+	if (likely(num)) {
+		pp2_bpool_put_buffs(hif,&sq->ent[sq->tail], &num);
+		sq->tail = (sq->tail + num) & MRVL_PP2_TX_SHADOWQ_MASK;
+		sq->size -= num;
+	}
+}
+
 static uint16_t
 mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 {
 	struct mrvl_txq *q = txq;
 	struct mrvl_shadow_txq *sq = &shadow_txqs[q->port_id][q->queue_id];
-	struct buff_release_entry entries[MRVL_PP2_TXD_MAX];
+	struct pp2_hif* hif = hifs[rte_lcore_id()];
 	struct pp2_ppio_desc descs[nb_pkts];
-	int i, j, ret, bytes_sent = 0;
-	uint16_t num, nb_done;
+	int i, ret, bytes_sent = 0;
+	uint16_t num, sq_free_size;
 	uint64_t addr;
 
-	if (!q->priv->ppio)
+	if (unlikely(!q->priv->ppio))
 		return 0;
+
+	if (sq->size)
+		mrvl_free_sent_buffers(q->priv->ppio, hif, sq, q->queue_id, 0);
+
+	sq_free_size = MRVL_PP2_TX_SHADOWQ_SIZE - sq->size - 1;
+	if (unlikely(nb_pkts > sq_free_size)) {
+		RTE_LOG(DEBUG, PMD,
+			"No room in shadow queue for %d packets!!! %d packets will be sent.\n",
+			nb_pkts, sq_free_size);
+		nb_pkts = sq_free_size;
+	}
 
 	for (i = 0; i < nb_pkts; i++) {
 		struct rte_mbuf *mbuf = tx_pkts[i];
@@ -1244,9 +1308,10 @@ mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 		enum pp2_outq_l3_type l3_type;
 		enum pp2_outq_l4_type l4_type;
 
-		sq->infs[sq->head].cookie = (pp2_cookie_t)(uint64_t)mbuf;
-		sq->infs[sq->head].addr = rte_mbuf_data_dma_addr_default(mbuf);
-		sq->head = (sq->head + 1) % RTE_DIM(sq->infs);
+		sq->ent[sq->head].buff.cookie = (pp2_cookie_t)(uint64_t)mbuf;
+		sq->ent[sq->head].buff.addr = rte_mbuf_data_dma_addr_default(mbuf);
+		sq->head = (sq->head + 1) & MRVL_PP2_TX_SHADOWQ_MASK;
+		sq->size++;
 
 		pp2_ppio_outq_desc_reset(&descs[i]);
 		pp2_ppio_outq_desc_set_phys_addr(&descs[i],
@@ -1273,23 +1338,33 @@ mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 	}
 
 	num = nb_pkts;
-	ret = pp2_ppio_send(q->priv->ppio, hifs[rte_lcore_id()], q->queue_id,
+	ret = pp2_ppio_send(q->priv->ppio, hif, q->queue_id,
 			    descs, &nb_pkts);
 	if (ret)
 		nb_pkts = 0;
 
 	/* number of packets that were not sent */
-	num -= nb_pkts;
-	if (unlikely(num)) {
+	if (unlikely(num > nb_pkts)) {
+#if 1
 		for (i = nb_pkts; i < num; i++) {
-			addr = cookie_addr_high | pp2_ppio_inq_desc_get_cookie(&descs[i]);
+ 			addr = cookie_addr_high | pp2_ppio_inq_desc_get_cookie(&descs[i]);
+ 			bytes_sent -= rte_pktmbuf_pkt_len((struct rte_mbuf *)addr);
+		}
+		num -= nb_pkts;
+		sq->head = (MRVL_PP2_TX_SHADOWQ_SIZE + sq->head - num) &
+			    MRVL_PP2_TX_SHADOWQ_MASK;
+		sq->size -= num;
+#else
+		for (i = nb_pkts; i < num; i++) {
+			sq->head = (MRVL_PP2_TX_SHADOWQ_SIZE + sq->head - 1) &
+			    	   MRVL_PP2_TX_SHADOWQ_MASK;
+			addr = cookie_addr_high | sq->ent[sq->head].buff.cookie;
 			bytes_sent -= rte_pktmbuf_pkt_len((struct rte_mbuf *)addr);
 		}
+		sq->size -= num - nb_pkts;
 
-		if (sq->head >= num)
-			sq->head -= num;
-		else
-			sq->head = RTE_DIM(sq->infs) + sq->head - num;
+#endif
+
 	}
 
 	/*
@@ -1309,38 +1384,6 @@ mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 	 * Perhaps MUSDK can count transmitted bytes?
 	 */
 	q->bytes_sent += bytes_sent;
-
-	pp2_ppio_get_num_outq_done(q->priv->ppio, hifs[rte_lcore_id()],
-				   q->queue_id, &nb_done);
-
-	for (i = 0, j = 0, num = 0; i < nb_done; i++) {
-		struct pp2_buff_inf *inf = &sq->infs[sq->tail];
-		struct rte_mbuf *mbuf;
-
-		addr = cookie_addr_high | inf->cookie;
-		mbuf = (struct rte_mbuf *)addr;
-
-		if (unlikely(mbuf->port == 0xff || mbuf->refcnt > 1)) {
-			rte_pktmbuf_free(mbuf);
-			goto skip;
-		}
-
-		entries[j].buff.addr = inf->addr;
-		entries[j].buff.cookie = inf->cookie;
-		entries[j].bpool = mrvl_port_to_bpool_lookup[mbuf->port];
-		rte_pktmbuf_reset(mbuf);
-		j++;
-		num++;
-skip:
-		sq->tail = (sq->tail + 1) % RTE_DIM(sq->infs);
-		if (sq->tail == 0) {
-			pp2_bpool_put_buffs(hifs[rte_lcore_id()], entries, &num);
-			j = 0;
-			num = 0;
-		}
-	}
-
-	pp2_bpool_put_buffs(hifs[rte_lcore_id()], entries, &num);
 
 	return nb_pkts;
 }
