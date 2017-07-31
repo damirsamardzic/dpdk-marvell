@@ -69,6 +69,9 @@
 /* maximum number of available hifs */
 #define MRVL_MUSDK_HIFS_MAX 9
 
+/* prefetch shift */
+#define MRVL_MUSDK_PREFETCH_SHIFT 2
+
 /* TCAM has 25 entries reserved for uc/mc filter entries */
 #define MRVL_MAC_ADDRS_MAX 25
 #define MRVL_MATCH_LEN 16
@@ -1143,6 +1146,17 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 		uint8_t l3_offset, l4_offset;
 		uint64_t addr;
 
+		if (likely((nb_pkts - i) > MRVL_MUSDK_PREFETCH_SHIFT)) {
+			struct pp2_ppio_desc *pref_desc;
+			u64 pref_addr;
+
+			pref_desc = &descs[i + MRVL_MUSDK_PREFETCH_SHIFT];
+			pref_addr =
+				cookie_addr_high | pp2_ppio_inq_desc_get_cookie(pref_desc);
+			rte_mbuf_prefetch_part1((struct rte_mbuf *)(pref_addr));
+			rte_mbuf_prefetch_part2((struct rte_mbuf *)(pref_addr));
+		}
+
 		addr = cookie_addr_high | pp2_ppio_inq_desc_get_cookie(&descs[i]);
 		mbuf = (struct rte_mbuf *)addr;
 
@@ -1307,6 +1321,14 @@ mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 		int gen_l3_cksum, gen_l4_cksum;
 		enum pp2_outq_l3_type l3_type;
 		enum pp2_outq_l4_type l4_type;
+
+		if (likely((nb_pkts - i) > MRVL_MUSDK_PREFETCH_SHIFT)) {
+			struct rte_mbuf *pref_pkt_hdr;
+
+			pref_pkt_hdr = tx_pkts[i + MRVL_MUSDK_PREFETCH_SHIFT];
+			rte_mbuf_prefetch_part1(pref_pkt_hdr);
+			rte_mbuf_prefetch_part2(pref_pkt_hdr);
+		}
 
 		sq->ent[sq->head].buff.cookie = (pp2_cookie_t)(uint64_t)mbuf;
 		sq->ent[sq->head].buff.addr = rte_mbuf_data_dma_addr_default(mbuf);
