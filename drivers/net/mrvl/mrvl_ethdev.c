@@ -72,9 +72,9 @@
 /* TCAM has 25 entries reserved for uc/mc filter entries */
 #define MRVL_MAC_ADDRS_MAX 25
 #define MRVL_MATCH_LEN 16
-#define MRVL_PKT_EFFEC_OFFS (MRVL_PKT_OFFS + PP2_MH_SIZE)
+#define MRVL_PKT_EFFEC_OFFS (MRVL_PKT_OFFS + MV_MH_SIZE)
 /* Maximum allowable packet size */
-#define MRVL_PKT_SIZE_MAX (10240 - PP2_MH_SIZE)
+#define MRVL_PKT_SIZE_MAX (10240 - MV_MH_SIZE)
 
 #define MRVL_IFACE_NAME_ARG "iface"
 #define MRVL_CFG_ARG "cfg"
@@ -251,8 +251,8 @@ static int
 mrvl_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
-	/* extra PP2_MH_SIZE bytes are required for Marvell tag */
-	uint16_t mru = mtu + PP2_MH_SIZE + ETHER_HDR_LEN + ETHER_CRC_LEN;
+	/* extra MV_MH_SIZE bytes are required for Marvell tag */
+	uint16_t mru = mtu + MV_MH_SIZE + ETHER_HDR_LEN + ETHER_CRC_LEN;
 	int ret;
 
 	if ((mtu < ETHER_MIN_MTU) || (mru > MRVL_PKT_SIZE_MAX))
@@ -880,7 +880,7 @@ mrvl_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
 	}
 
 	min_size = mp->elt_size - sizeof(struct rte_mbuf) -
-		   RTE_PKTMBUF_HEADROOM - MRVL_PKT_EFFEC_OFFS - PP2_MH_SIZE;
+		   RTE_PKTMBUF_HEADROOM - MRVL_PKT_EFFEC_OFFS - MV_MH_SIZE;
 	if (min_size > mp->elt_size) {
 		RTE_LOG(ERR, PMD, "Mempool element is to small\n");
 		return -EINVAL;
