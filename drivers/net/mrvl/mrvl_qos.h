@@ -75,11 +75,11 @@ struct mrvl_qos_cfg {
 			uint8_t weight;
 			uint8_t rate_limit;
 		} outq[MRVL_PP2_RXQ_MAX];
+		enum pp2_cls_qos_tbl_type mapping_priority;
 		uint16_t inqs;
 		uint16_t outqs;
 		uint8_t default_tc;
 		uint8_t use_global_defaults;
-
 	} port[RTE_MAX_ETHPORTS];
 };
 
@@ -106,11 +106,13 @@ mrvl_get_qoscfg(const char *key __rte_unused, const char *path,
  * Sets up RX queues, their Traffic Classes and DPDK rxq->(TC,inq) mapping.
  *
  * @param priv Port's private data
+ * @param portid DPDK port ID
  * @param max_queues Maximum number of queues to configure.
  * @returns 0 in case of success, negative value otherwise.
  */
 int
-mrvl_configure_rxqs(struct mrvl_priv *priv, uint16_t max_queues);
+mrvl_configure_rxqs(struct mrvl_priv *priv, uint8_t portid,
+		uint16_t max_queues);
 
 /**
  * Start QoS mapping.

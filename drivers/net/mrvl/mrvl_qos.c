@@ -53,10 +53,13 @@
 #define MRVL_TOK_DEFAULT_RATE_LIMIT "default_rate_limit"
 #define MRVL_TOK_DEFAULT_TC "default_tc"
 #define MRVL_TOK_DSCP "dscp"
+#define MRVL_TOK_MAPPING_PRIORITY "mapping_priority"
 #define MRVL_TOK_MAX_BURST_KFPS "max_burst_kfps"
 #define MRVL_TOK_MAX_BURST_MBPS "max_burst_mbps"
 #define MRVL_TOK_MAX_THROUGHPUT_KFPS "max_throughput_kfps"
 #define MRVL_TOK_MAX_THROUGHPUT_MBPS "max_throughput_mbps"
+#define MRVL_TOK_IP "ip"
+#define MRVL_TOK_IP_VLAN "ip/vlan"
 #define MRVL_TOK_PCP "pcp"
 #define MRVL_TOK_PORT "port"
 #define MRVL_TOK_QOS_MODE "qos_mode"
@@ -64,6 +67,8 @@
 #define MRVL_TOK_SP "SP"
 #define MRVL_TOK_TC "tc"
 #define MRVL_TOK_TXQ "txq"
+#define MRVL_TOK_VLAN "vlan"
+#define MRVL_TOK_VLAN_IP "vlan/ip"
 #define MRVL_TOK_WEIGHT "weight"
 #define MRVL_TOK_WRR "WRR"
 
@@ -378,7 +383,7 @@ parse_tc_cfg(struct rte_cfgfile *file, int port, int tc,
 			RTE_DIM(cfg->port[port].tc[tc].inq),
 			MRVL_PP2_RXQ_MAX);
 		if (n < 0) {
-			RTE_LOG(ERR, PMD, "Error %d while parsing: %s",
+			RTE_LOG(ERR, PMD, "Error %d while parsing: %s\n",
 				n, entry);
 			return n;
 		}
@@ -393,7 +398,7 @@ parse_tc_cfg(struct rte_cfgfile *file, int port, int tc,
 			RTE_DIM(cfg->port[port].tc[tc].pcp),
 			MAX_PCP);
 		if (n < 0) {
-			RTE_LOG(ERR, PMD, "Error %d while parsing: %s",
+			RTE_LOG(ERR, PMD, "Error %d while parsing: %s\n",
 				n, entry);
 			return n;
 		}
@@ -408,7 +413,7 @@ parse_tc_cfg(struct rte_cfgfile *file, int port, int tc,
 			RTE_DIM(cfg->port[port].tc[tc].dscp),
 			MAX_DSCP);
 		if (n < 0) {
-			RTE_LOG(ERR, PMD, "Error %d while parsing: %s",
+			RTE_LOG(ERR, PMD, "Error %d while parsing: %s\n",
 				n, entry);
 			return n;
 		}
@@ -467,6 +472,7 @@ mrvl_get_qoscfg(const char *key __rte_unused, const char *path,
 		if (rte_cfgfile_num_sections(file, sec_name,
 				strlen(sec_name)) <= 0) {
 			(*cfg)->port[n].use_global_defaults = 1;
+			(*cfg)->port[n].mapping_priority = PP2_CLS_QOS_TBL_VLAN_IP_PRI;
 			continue;
 		}
 
@@ -520,8 +526,38 @@ mrvl_get_qoscfg(const char *key __rte_unused, const char *path,
 			(*cfg)->port[n].default_tc = (uint8_t)val;
 		} else {
 			RTE_LOG(ERR, PMD,
-				"Default Traffic Class required in custom configuration!");
+				"Default Traffic Class required in custom configuration!\n");
+			return -1;
 		}
+
+		entry = rte_cfgfile_get_entry(file, sec_name,
+				MRVL_TOK_MAPPING_PRIORITY);
+		if (entry) {
+			if (!strncmp(entry, MRVL_TOK_VLAN_IP,
+				sizeof(MRVL_TOK_VLAN_IP)))
+				(*cfg)->port[n].mapping_priority =
+					PP2_CLS_QOS_TBL_VLAN_IP_PRI;
+			else if (!strncmp(entry, MRVL_TOK_IP_VLAN,
+				sizeof(MRVL_TOK_IP_VLAN)))
+				(*cfg)->port[n].mapping_priority =
+					PP2_CLS_QOS_TBL_IP_VLAN_PRI;
+			else if (!strncmp(entry, MRVL_TOK_IP,
+				sizeof(MRVL_TOK_IP)))
+				(*cfg)->port[n].mapping_priority =
+					PP2_CLS_QOS_TBL_IP_PRI;
+			else if (!strncmp(entry, MRVL_TOK_VLAN,
+				sizeof(MRVL_TOK_VLAN)))
+				(*cfg)->port[n].mapping_priority =
+					PP2_CLS_QOS_TBL_VLAN_PRI;
+			else {
+				rte_exit(EXIT_FAILURE,
+					"Error in parsing %s value (%s)!\n",
+					MRVL_TOK_MAPPING_PRIORITY, entry);
+			}
+		} else
+			(*cfg)->port[n].mapping_priority =
+				PP2_CLS_QOS_TBL_VLAN_IP_PRI;
+
 
 		if ((rate_limit == 1) &&
 			(((*cfg)->port[n].rate_limit_params.
@@ -597,16 +633,18 @@ setup_tc(struct pp2_ppio_tc_params *param, uint8_t inqs,
  * Sets up RX queues, their Traffic Classes and DPDK rxq->(TC,inq) mapping.
  *
  * @param priv Port's private data
+ * @param portid DPDK port ID
  * @param max_queues Maximum number of queues to configure.
  * @returns 0 in case of success, negative value otherwise.
  */
 int
-mrvl_configure_rxqs(struct mrvl_priv *priv, uint16_t max_queues)
+mrvl_configure_rxqs(struct mrvl_priv *priv, uint8_t portid,
+	uint16_t max_queues)
 {
 	size_t i, tc;
 
 	if ((mrvl_qos_cfg == NULL) ||
-		(mrvl_qos_cfg->port[priv->ppio_id].use_global_defaults)) {
+		(mrvl_qos_cfg->port[portid].use_global_defaults)) {
 		/* No port configuration, use default: 1 TC, no QoS. */
 		priv->ppio_params.inqs_params.num_tcs = 1;
 		setup_tc(&priv->ppio_params.inqs_params.tcs_params[0],
@@ -620,10 +658,10 @@ mrvl_configure_rxqs(struct mrvl_priv *priv, uint16_t max_queues)
 		return 0;
 	}
 
-	priv->qos_tbl_params.type = PP2_CLS_QOS_TBL_VLAN_IP_PRI;
-
 	/* We need only a subset of configuration. */
-	struct port_cfg *port_cfg = &mrvl_qos_cfg->port[priv->ppio_id];
+	struct port_cfg *port_cfg = &mrvl_qos_cfg->port[portid];
+
+	priv->qos_tbl_params.type = port_cfg->mapping_priority;
 
 	/*
 	 * We need to reverse mapping, from tc->pcp (better from usability point
@@ -638,7 +676,7 @@ mrvl_configure_rxqs(struct mrvl_priv *priv, uint16_t max_queues)
 		if (port_cfg->tc[tc].pcps > RTE_DIM(port_cfg->tc[0].pcp)) {
 			/* Better safe than sorry. */
 			RTE_LOG(ERR, PMD,
-				"Too many PCPs configured in TC %zu!", tc);
+				"Too many PCPs configured in TC %zu!\n", tc);
 			return -1;
 		}
 		for (i = 0; i < port_cfg->tc[tc].pcps; ++i) {
@@ -659,7 +697,7 @@ mrvl_configure_rxqs(struct mrvl_priv *priv, uint16_t max_queues)
 		if (port_cfg->tc[tc].dscps > RTE_DIM(port_cfg->tc[0].dscp)) {
 			/* Better safe than sorry. */
 			RTE_LOG(ERR, PMD,
-				"Too many DSCPs configured in TC %zu!", tc);
+				"Too many DSCPs configured in TC %zu!\n", tc);
 			return -1;
 		}
 		for (i = 0; i < port_cfg->tc[tc].dscps; ++i) {
@@ -681,7 +719,7 @@ mrvl_configure_rxqs(struct mrvl_priv *priv, uint16_t max_queues)
 		if (port_cfg->tc[tc].inqs > RTE_DIM(port_cfg->tc[0].inq)) {
 			/* Overflow. */
 			RTE_LOG(ERR, PMD,
-				"Too many RX queues configured per TC %zu!",
+				"Too many RX queues configured per TC %zu!\n",
 				tc);
 			return -1;
 		}
@@ -724,7 +762,7 @@ mrvl_start_qos_mapping(struct mrvl_priv *priv)
 	size_t i;
 
 	if (priv->ppio == NULL) {
-		RTE_LOG(ERR, PMD, "ppio must not be NULL here!");
+		RTE_LOG(ERR, PMD, "ppio must not be NULL here!\n");
 		return -1;
 	}
 
