@@ -227,7 +227,8 @@ mrvl_dev_configure(struct rte_eth_dev *dev)
 		dev->data->mtu = dev->data->dev_conf.rxmode.max_rx_pkt_len -
 				 ETHER_HDR_LEN - ETHER_CRC_LEN;
 
-	ret = mrvl_configure_rxqs(priv, dev->data->nb_rx_queues);
+	ret = mrvl_configure_rxqs(priv, dev->data->port_id,
+		dev->data->nb_rx_queues);
 	if (ret < 0)
 		return ret;
 
@@ -348,10 +349,13 @@ mrvl_dev_start(struct rte_eth_dev *dev)
 		priv->vlan_flushed = 1;
 	}
 
-	ret = mrvl_start_qos_mapping(priv);
-	if (ret) {
-		pp2_ppio_deinit(priv->ppio);
-		return ret;
+	/* For default QoS config, don't start classifier. */
+	if (mrvl_qos_cfg != NULL) {
+		ret = mrvl_start_qos_mapping(priv);
+		if (ret) {
+			pp2_ppio_deinit(priv->ppio);
+			return ret;
+		}
 	}
 
 	ret = mrvl_dev_set_link_up(dev);
@@ -870,7 +874,7 @@ mrvl_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
 
 	if (priv->rxq_map[idx].tc == MRVL_UNKNOWN_TC) {
 		/* Unknown TC mapping, mapping will not have a correct queue. */
-		RTE_LOG(ERR, PMD, "Unknown TC mapping for queue %hu port %hhu",
+		RTE_LOG(ERR, PMD, "Unknown TC mapping for queue %hu eth%hhu\n",
 				idx, priv->ppio_id);
 		return -EFAULT;
 	}
@@ -1497,8 +1501,10 @@ mrvl_init_hifs(void)
 		params.match = match;
 		params.out_size = MRVL_PP2_AGGR_TXQD_MAX;
 		ret = pp2_hif_init(&params, &hifs[i]);
-		if (ret)
+		if (ret) {
+			RTE_LOG(ERR, PMD,"Failed to initialize hif %d\n", i);
 			return ret;
+		}
 	}
 
 	return 0;
@@ -1561,8 +1567,10 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 		goto out_free_kvlist;
 
 	ret = mrvl_init_pp2();
-	if (ret)
+	if (ret) {
+		RTE_LOG(ERR, PMD, "Failed to init PP!\n");
 		goto out_deinit_dma;
+	}
 
 	ret = mrvl_init_hifs();
 	if (ret)
