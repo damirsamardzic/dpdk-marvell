@@ -1044,7 +1044,7 @@ static const struct eth_dev_ops mrvl_ops = {
 	.rss_hash_conf_get = mrvl_rss_hash_conf_get,
 };
 
-static uint32_t
+static inline uint32_t
 mrvl_desc_to_packet_type_and_offset(struct pp2_ppio_desc *desc,
 				    uint8_t *l3_offset, uint8_t *l4_offset)
 {
@@ -1128,7 +1128,7 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 	int i, ret, rx_done = 0;
 	uint32_t num;
 
-	if (!q->priv->ppio)
+	if (unlikely(!q->priv->ppio))
 		return 0;
 
 	ret = pp2_ppio_recv(q->priv->ppio,
@@ -1136,7 +1136,7 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 			q->priv->rxq_map[q->queue_id].inq,
 			descs,
 			&nb_pkts);
-	if (ret < 0) {
+	if (unlikely(ret < 0)) {
 		RTE_LOG(ERR, PMD, "Failed to receive packets\n");
 		return 0;
 	}
@@ -1201,7 +1201,7 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 	return rx_done;
 }
 
-static int
+static inline int
 mrvl_prepare_proto_info(uint64_t ol_flags, uint32_t packet_type,
 			enum pp2_outq_l3_type *l3_type,
 			enum pp2_outq_l4_type *l4_type,
@@ -1350,7 +1350,7 @@ mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 		ret = mrvl_prepare_proto_info(mbuf->ol_flags, mbuf->packet_type,
 					      &l3_type, &l4_type, &gen_l3_cksum,
 					      &gen_l4_cksum);
-		if (ret)
+		if (unlikely(ret))
 			continue;
 
 		pp2_ppio_outq_desc_set_proto_info(&descs[i], l3_type, l4_type,
