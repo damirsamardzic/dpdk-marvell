@@ -1162,14 +1162,13 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 
 		/* drop packet in case of mac, overrun or resource error */
 		if (unlikely(pp2_ppio_inq_desc_get_l2_pkt_error(&descs[i]) != PP2_DESC_ERR_OK)) {
-			struct buff_release_entry entry = {
-				.buff.addr = rte_mbuf_data_dma_addr_default(mbuf),
-				.buff.cookie = (pp2_cookie_t)(uint64_t)mbuf,
-				.bpool = q->priv->bpool,
+			struct pp2_buff_inf binf = {
+				.addr = rte_mbuf_data_dma_addr_default(mbuf),
+				.cookie = (pp2_cookie_t)(uint64_t)mbuf,
 			};
 
 			num = 1;
-			pp2_bpool_put_buffs(hifs[rte_lcore_id()], &entry, (uint16_t *)&num);
+			pp2_bpool_put_buff(hifs[rte_lcore_id()], q->priv->bpool, &binf);
 			q->drop_mac++;
 			continue;
 		}
