@@ -799,9 +799,12 @@ static void mrvl_rxq_info_get(struct rte_eth_dev *dev, uint16_t rx_queue_id,
 {
 	struct mrvl_rxq *q = dev->data->rx_queues[rx_queue_id];
 	struct mrvl_priv *priv = dev->data->dev_private;
+	int inq = priv->rxq_map[rx_queue_id].inq;
+	int tc = priv->rxq_map[rx_queue_id].tc;
 
 	qinfo->mp = q->mp;
-	qinfo->nb_desc = priv->ppio_params.inqs_params.tcs_params[0].inqs_params[rx_queue_id].size;
+	qinfo->nb_desc = priv->ppio_params.inqs_params.
+			 tcs_params[tc].inqs_params[inq].size;
 }
 
 static void mrvl_txq_info_get(struct rte_eth_dev *dev, uint16_t tx_queue_id,
