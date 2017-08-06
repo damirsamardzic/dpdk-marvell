@@ -448,7 +448,8 @@ mrvl_dev_stop(struct rte_eth_dev *dev)
 	mrvl_dev_set_link_down(dev);
 	mrvl_flush_rx_queues(dev);
 	mrvl_flush_tx_shadow_queues(dev);
-	pp2_cls_qos_tbl_deinit(priv->qos_tbl);
+	if (priv->qos_tbl)
+		pp2_cls_qos_tbl_deinit(priv->qos_tbl);
 	pp2_ppio_deinit(priv->ppio);
 	priv->ppio = NULL;
 }
