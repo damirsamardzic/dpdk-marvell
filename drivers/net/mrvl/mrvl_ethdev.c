@@ -88,6 +88,9 @@
 
 #define MRVL_COOKIE_ADDR_INVALID ~0ULL
 
+#define MRVL_COOKIE_HIGH_ADDR_SHIFT	(sizeof(pp2_cookie_t) * 8)
+#define MRVL_COOKIE_HIGH_ADDR_MASK	(~0ULL << MRVL_COOKIE_HIGH_ADDR_SHIFT)
+
 static const char *valid_args[] = {
 	MRVL_IFACE_NAME_ARG,
 	MRVL_CFG_ARG,
@@ -823,7 +826,6 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 {
 	struct buff_release_entry entries[MRVL_PP2_TXD_MAX];
 	struct rte_mbuf *mbufs[MRVL_PP2_TXD_MAX];
-	uint64_t mask = ~0LL << 32;
 	int i, ret;
 	struct pp2_hif *hif = hifs[rte_lcore_id()];
 
@@ -832,10 +834,12 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 		return ret;
 
 	if (cookie_addr_high == MRVL_COOKIE_ADDR_INVALID)
-		cookie_addr_high = (uint64_t)mbufs[0] & mask;
+		cookie_addr_high =
+			(uint64_t)mbufs[0] & MRVL_COOKIE_HIGH_ADDR_MASK;
 
 	for (i = 0; i < num; i++) {
-		if (((uint64_t)mbufs[i] & mask) != cookie_addr_high) {
+		if (((uint64_t)mbufs[i] & MRVL_COOKIE_HIGH_ADDR_MASK)
+			!= cookie_addr_high) {
 			RTE_LOG(ERR, PMD,
 				"mbuf virtual addr high 0x%lx out of range\n",
 				(uint64_t)mbufs[i] >> 32);
