@@ -1358,11 +1358,8 @@ mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 	}
 
 	num = nb_pkts;
-	ret = pp2_ppio_send(q->priv->ppio, hif, q->queue_id,
+	pp2_ppio_send(q->priv->ppio, hif, q->queue_id,
 			    descs, &nb_pkts);
-	if (ret)
-		nb_pkts = 0;
-
 	/* number of packets that were not sent */
 	if (unlikely(num > nb_pkts)) {
 #if 1
