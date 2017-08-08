@@ -277,7 +277,9 @@ mrvl_crypto_set_auth_session_parameters(struct mrvl_crypto_session *sess,
 	sess->sam_sess_params.u.basic.auth_aad_len =
 		auth_xform->auth.add_auth_data_length;
 	sess->sam_sess_params.u.basic.auth_icv_len = auth_xform->auth.digest_length;
-	sess->sam_sess_params.auth_key = auth_xform->auth.key.data;
+	/* auth_key must be NULL if auth algorithm does not use HMAC */
+	sess->sam_sess_params.auth_key = auth_xform->auth.key.length ?
+					 auth_xform->auth.key.data : NULL;
 	sess->sam_sess_params.auth_key_len = auth_xform->auth.key.length;
 
 	return 0;
