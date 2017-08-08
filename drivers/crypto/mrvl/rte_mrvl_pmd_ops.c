@@ -618,8 +618,17 @@ mrvl_crypto_pmd_qp_setup(struct rte_cryptodev *dev, uint16_t qp_id,
 	do { /* Error handling block */
 		qp->id = qp_id;
 
+		/*
+		 * Following cio-hw_engine:hw_ring match strings are available:
+		 * cio-0:0, cio-0:1, cio-0:2, cio-0:3,
+		 * cio-1:0, cio-1:1, cio-1:2, cio-1:3
+		 *
+		 * In case two hw engines are available qp with ids 4,5,6,7
+		 * will be handled by the second engine.
+		 */
 		n = snprintf(qp->name, sizeof(qp->name), "cio-%u:%u",
-				dev->data->dev_id, qp->id);
+			     qp->id >= SAM_HW_RING_NUM,
+			     qp->id % SAM_HW_RING_NUM);
 
 		if (n >= sizeof(qp->name))
 			break;
