@@ -65,6 +65,7 @@ DIRS-y += l2fwd-keepalive
 DIRS-y += l2fwd-keepalive/ka-agent
 ifeq ($(CONFIG_RTE_LIBRTE_HASH),y)
 DIRS-$(CONFIG_RTE_LIBRTE_LPM) += l3fwd
+DIRS-$(CONFIG_RTE_LIBRTE_LPM) += mv_l3fwd
 endif
 DIRS-$(CONFIG_RTE_LIBRTE_ACL) += l3fwd-acl
 ifeq ($(CONFIG_RTE_LIBRTE_LPM)$(CONFIG_RTE_LIBRTE_HASH),yy)
