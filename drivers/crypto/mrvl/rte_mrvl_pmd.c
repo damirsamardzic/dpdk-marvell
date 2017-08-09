@@ -800,14 +800,7 @@ init_error:
 static int
 cryptodev_mrvl_crypto_init(struct rte_vdev_device *vdev)
 {
-	struct rte_crypto_vdev_init_params init_params = {
-		.max_nb_queue_pairs =
-				RTE_CRYPTODEV_VDEV_DEFAULT_MAX_NB_QUEUE_PAIRS,
-		.max_nb_sessions =
-				RTE_CRYPTODEV_VDEV_DEFAULT_MAX_NB_SESSIONS,
-		.socket_id = rte_socket_id(),
-		.name = {0}
-	};
+	struct rte_crypto_vdev_init_params init_params = { };
 	const char *name;
 	const char *input_args;
 
@@ -819,7 +812,10 @@ cryptodev_mrvl_crypto_init(struct rte_vdev_device *vdev)
 	if (!input_args)
 		return -EINVAL;
 
-	rte_cryptodev_parse_vdev_init_params(&init_params, input_args);
+	init_params.max_nb_queue_pairs = sam_get_num_inst() * SAM_HW_RING_NUM;
+	init_params.max_nb_sessions = RTE_CRYPTODEV_VDEV_DEFAULT_MAX_NB_SESSIONS;
+	init_params.socket_id = rte_socket_id();
+
 
 	RTE_LOG(INFO, PMD, "Initialising %s on NUMA node %d\n", name,
 			init_params.socket_id);
