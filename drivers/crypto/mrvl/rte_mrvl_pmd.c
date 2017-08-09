@@ -779,9 +779,8 @@ cryptodev_mrvl_crypto_create(const char *name,
 		return ret;
 
 	sam_params.max_num_sessions = internals->max_nb_sessions;
-	sam_init(&sam_params);
 
-	return 0;
+	return sam_init(&sam_params);
 
 init_error:
 	MRVL_CRYPTO_LOG_ERR(
