@@ -1167,7 +1167,6 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 				.cookie = (pp2_cookie_t)(uint64_t)mbuf,
 			};
 
-			num = 1;
 			pp2_bpool_put_buff(hifs[rte_lcore_id()], q->priv->bpool, &binf);
 			q->drop_mac++;
 			continue;
@@ -1185,9 +1184,8 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 		if (likely(q->cksum_enabled))
 			mbuf->ol_flags = mrvl_desc_to_ol_flags(&descs[i]);
 
-		rx_pkts[i] = mbuf;
+		rx_pkts[rx_done++] = mbuf;
 		q->bytes_recv += mbuf->pkt_len;
-		rx_done++;
 	}
 
 	pp2_bpool_get_num_buffs(q->priv->bpool, &num);
