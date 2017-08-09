@@ -1,6 +1,7 @@
 #   BSD LICENSE
 #
-#   Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
+#   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
+#   Copyright(c) 2017 Marvell International Ltd.
 #   All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or without
@@ -39,7 +40,7 @@ RTE_TARGET ?= x86_64-native-linuxapp-gcc
 include $(RTE_SDK)/mk/rte.vars.mk
 
 # binary name
-APP = mv-l2fwd
+APP = mv_l2fwd
 
 # all source are stored in SRCS-y
 SRCS-y := main.c
