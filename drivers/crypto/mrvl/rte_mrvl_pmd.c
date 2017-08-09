@@ -803,6 +803,7 @@ cryptodev_mrvl_crypto_init(struct rte_vdev_device *vdev)
 	struct rte_crypto_vdev_init_params init_params = { };
 	const char *name;
 	const char *input_args;
+	int ret;
 
 	name = rte_vdev_device_name(vdev);
 	if (name == NULL)
@@ -816,6 +817,11 @@ cryptodev_mrvl_crypto_init(struct rte_vdev_device *vdev)
 	init_params.max_nb_sessions = RTE_CRYPTODEV_VDEV_DEFAULT_MAX_NB_SESSIONS;
 	init_params.socket_id = rte_socket_id();
 
+	ret = rte_cryptodev_parse_vdev_init_params(&init_params, input_args);
+	if (ret) {
+		RTE_LOG(ERR, PMD, "Failed to parse input arguments\n");
+		return ret;
+	}
 
 	RTE_LOG(INFO, PMD, "Initialising %s on NUMA node %d\n", name,
 			init_params.socket_id);
