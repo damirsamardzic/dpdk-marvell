@@ -83,8 +83,8 @@
 /*
  * Configurable number of RX/TX ring descriptors
  */
-#define RTE_TEST_RX_DESC_DEFAULT 128
-#define RTE_TEST_TX_DESC_DEFAULT 512
+#define RTE_TEST_RX_DESC_DEFAULT 1024
+#define RTE_TEST_TX_DESC_DEFAULT 2048
 
 #define MAX_TX_QUEUE_PER_PORT RTE_MAX_ETHPORTS
 #define MAX_RX_QUEUE_PER_PORT 128
@@ -109,6 +109,8 @@ static int parse_ptype; /**< Parse packet type using rx callback, and */
 /* Global variables. */
 
 volatile bool force_quit;
+
+int burst_size;
 
 /* ethernet addresses of ports */
 uint64_t dest_eth_addr[RTE_MAX_ETHPORTS];
@@ -326,6 +328,7 @@ print_usage(const char *prgname)
 
 		"  -p PORTMASK: Hexadecimal bitmask of ports to configure\n"
 		"  -P : Enable promiscuous mode\n"
+		"  -b BURST: Burst size\n"
 		"  -E : Enable exact match\n"
 		"  -L : Enable longest prefix match (default)\n"
 		"  --config (port,queue,lcore): Rx queue configuration\n"
@@ -478,6 +481,7 @@ parse_eth_dest(const char *optarg)
 static const char short_options[] =
 	"p:"  /* portmask */
 	"P"   /* promiscuous */
+	"b:"  /* burst size */
 	"L"   /* enable long prefix match */
 	"E"   /* enable exact match */
 	;
@@ -539,6 +543,7 @@ parse_args(int argc, char **argv)
 	char *prgname = argv[0];
 
 	argvopt = argv;
+	burst_size = 0;
 
 	/* Error or normal output strings. */
 	const char *str1 = "L3FWD: Invalid portmask";
@@ -574,6 +579,13 @@ parse_args(int argc, char **argv)
 		case 'P':
 			printf("%s\n", str2);
 			promiscuous_on = 1;
+			break;
+
+		case 'b':
+			burst_size = atoi(optarg);
+			if (burst_size > MAX_PKT_BURST)
+				burst_size = MAX_PKT_BURST;
+			printf("Burst Size: %d\n", burst_size);
 			break;
 
 		case 'E':
@@ -854,6 +866,7 @@ main(int argc, char **argv)
 	uint32_t n_tx_queue, nb_lcores;
 	uint8_t portid, nb_rx_queue, queue, socketid;
 
+	rte_set_application_usage_hook(print_usage);
 
 	/* init EAL */
 	ret = rte_eal_init(argc, argv);
@@ -891,6 +904,8 @@ main(int argc, char **argv)
 		rte_exit(EXIT_FAILURE, "check_port_config failed\n");
 
 	nb_lcores = rte_lcore_count();
+	if (!burst_size)
+		burst_size = MAX_PKT_BURST >> (nb_lcores - 1);
 
 	/* Setup function pointers for lookup method. */
 	setup_l3fwd_lookup_tables();
@@ -994,7 +1009,7 @@ main(int argc, char **argv)
 			printf("rxq=%d,%d,%d ", portid, queueid, socketid);
 			fflush(stdout);
 
-			ret = rte_eth_rx_queue_setup(portid, queueid, nb_rxd,
+			ret = rte_eth_rx_queue_setup(portid, queueid, nb_rxd + 2*burst_size,
 					socketid,
 					NULL,
 					pktmbuf_pool[socketid]);

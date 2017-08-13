@@ -342,7 +342,7 @@ send_packetsx4(struct lcore_conf *qconf, uint8_t port, struct rte_mbuf *m[],
 	 */
 
 	n = len + num;
-	n = (n > MAX_PKT_BURST) ? MAX_PKT_BURST - len : num;
+	n = (n > burst_size) ? burst_size - len : num;
 
 	j = 0;
 	switch (n % FWDSTEP) {
@@ -365,9 +365,9 @@ send_packetsx4(struct lcore_conf *qconf, uint8_t port, struct rte_mbuf *m[],
 	len += n;
 
 	/* enough pkts to be sent */
-	if (unlikely(len == MAX_PKT_BURST)) {
+	if (unlikely(len == burst_size)) {
 
-		send_burst(qconf, MAX_PKT_BURST, port);
+		send_burst(qconf, burst_size, port);
 
 		/* copy rest of the packets into the TX buffer. */
 		len = num - n;
@@ -456,7 +456,7 @@ send_packets_multi(struct lcore_conf *qconf, struct rte_mbuf **pkts_burst,
 	} else {
 		/* set dlp and lp to the never used values. */
 		dlp = BAD_PORT - 1;
-		lp = pnum + MAX_PKT_BURST;
+		lp = pnum + burst_size;
 	}
 
 	/* Process up to last 3 packets one by one. */

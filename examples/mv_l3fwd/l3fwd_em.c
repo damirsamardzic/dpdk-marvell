@@ -665,7 +665,8 @@ em_main_loop(__attribute__((unused)) void *dummy)
 		return 0;
 	}
 
-	RTE_LOG(INFO, L3FWD, "entering main loop on lcore %u\n", lcore_id);
+	RTE_LOG(INFO, L3FWD, "entering EM main loop on lcore %u, burst: %d\n",
+		lcore_id, burst_size);
 
 	for (i = 0; i < qconf->n_rx_queue; i++) {
 
@@ -706,7 +707,7 @@ em_main_loop(__attribute__((unused)) void *dummy)
 			portid = qconf->rx_queue_list[i].port_id;
 			queueid = qconf->rx_queue_list[i].queue_id;
 			nb_rx = rte_eth_rx_burst(portid, queueid, pkts_burst,
-				MAX_PKT_BURST);
+				burst_size);
 			if (nb_rx == 0)
 				continue;
 

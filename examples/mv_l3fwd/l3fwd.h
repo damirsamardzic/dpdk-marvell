@@ -45,7 +45,7 @@
 #define NO_HASH_MULTI_LOOKUP 1
 #endif
 
-#define MAX_PKT_BURST     32
+#define MAX_PKT_BURST     256
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
 
 #define MAX_RX_QUEUE_PER_LCORE 16
@@ -107,6 +107,7 @@ extern struct ether_addr ports_eth_addr[RTE_MAX_ETHPORTS];
 
 /* mask of enabled ports */
 extern uint32_t enabled_port_mask;
+extern int burst_size;
 
 /* Used only in exact match mode. */
 extern int ipv6; /**< ipv6 is false by default. */
@@ -149,8 +150,8 @@ send_single_packet(struct lcore_conf *qconf,
 	len++;
 
 	/* enough pkts to be sent */
-	if (unlikely(len == MAX_PKT_BURST)) {
-		send_burst(qconf, MAX_PKT_BURST, port);
+	if (unlikely(len == burst_size)) {
+		send_burst(qconf, burst_size, port);
 		len = 0;
 	}
 
