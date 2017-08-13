@@ -91,6 +91,10 @@
 
 #define MAX_LCORE_PARAMS 1024
 
+#define ETHER_FRAME_LEN_TO_MTU(length)	\
+	(length - ETHER_HDR_LEN -	\
+	ETHER_CRC_LEN)	/**< Packet size to ethernet MTU. */
+
 /* Static global variables used within this file. */
 static uint16_t nb_rxd = RTE_TEST_RX_DESC_DEFAULT;
 static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
@@ -714,7 +718,7 @@ print_ethaddr(const char *name, const struct ether_addr *eth_addr)
 }
 
 static int
-init_mem(unsigned nb_mbuf)
+init_mem(unsigned nb_mbuf, unsigned buf_size)
 {
 	struct lcore_conf *qconf;
 	int socketid;
@@ -741,7 +745,7 @@ init_mem(unsigned nb_mbuf)
 			pktmbuf_pool[socketid] =
 				rte_pktmbuf_pool_create(s, nb_mbuf,
 					MEMPOOL_CACHE_SIZE, 0,
-					RTE_MBUF_DEFAULT_BUF_SIZE, socketid);
+					buf_size, socketid);
 			if (pktmbuf_pool[socketid] == NULL)
 				rte_exit(EXIT_FAILURE,
 					"Cannot init mbuf pool on socket %d\n",
@@ -949,7 +953,7 @@ main(int argc, char **argv)
 			(struct ether_addr *)(val_eth + portid) + 1);
 
 		/* init memory */
-		ret = init_mem(NB_MBUF);
+		ret = init_mem(NB_MBUF, port_conf.rxmode.max_rx_pkt_len);
 		if (ret < 0)
 			rte_exit(EXIT_FAILURE, "init_mem failed\n");
 
@@ -1042,6 +1046,13 @@ main(int argc, char **argv)
 		 */
 		if (promiscuous_on)
 			rte_eth_promiscuous_enable(portid);
+
+		if (port_conf.rxmode.jumbo_frame)
+			rte_eth_dev_set_mtu(
+				portid,
+				ETHER_FRAME_LEN_TO_MTU(
+				port_conf.rxmode.max_rx_pkt_len)
+				);
 	}
 
 	printf("\n");
