@@ -45,12 +45,7 @@
 #define MRVL_UNKNOWN_TC (0xFF)
 
 /* stubs */
-enum pp2_ppio_outqs_sched_mode_stub {
-	PP2_PPIO_SCHED_M_SP = 0,
-	PP2_PPIO_SCHED_M_WRR
-};
-
-struct pp2_ppio_rate_limit_params {
+struct pp2_ppio_rate_limit_params_stub {
 	uint32_t max_burst_kfps;
 	uint32_t max_burst_mbps;
 	uint32_t max_throuput_kfps;
@@ -60,7 +55,7 @@ struct pp2_ppio_rate_limit_params {
 /* QoS config. */
 struct mrvl_qos_cfg {
 	struct port_cfg {
-		struct pp2_ppio_rate_limit_params rate_limit_params;
+		struct pp2_ppio_rate_limit_params_stub rate_limit_params;
 		struct {
 			uint8_t inq[MRVL_PP2_RXQ_MAX];
 			uint8_t dscp[MRVL_CP_PER_TC];
@@ -70,8 +65,8 @@ struct mrvl_qos_cfg {
 			uint8_t pcps;
 		} tc[MRVL_PP2_TC_MAX];
 		struct {
-			struct pp2_ppio_rate_limit_params rate_limit_params;
-			enum pp2_ppio_outqs_sched_mode_stub sched_mode;
+			struct pp2_ppio_rate_limit_params_stub rate_limit_params;
+			enum pp2_ppio_outq_sched_mode sched_mode;
 			uint8_t weight;
 			uint8_t rate_limit;
 		} outq[MRVL_PP2_RXQ_MAX];
