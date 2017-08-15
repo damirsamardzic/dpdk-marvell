@@ -267,6 +267,10 @@ check_port_config(const unsigned nb_ports)
 			return -1;
 		}
 	}
+
+	for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++)
+		if (dst_ports[portid] == BAD_PORT)
+			dst_ports[portid] = portid;
 	return 0;
 }
 
