@@ -1164,6 +1164,7 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 
 		addr = cookie_addr_high | pp2_ppio_inq_desc_get_cookie(&descs[i]);
 		mbuf = (struct rte_mbuf *)addr;
+		rte_pktmbuf_reset(mbuf);
 
 		/* drop packet in case of mac, overrun or resource error */
 		if (unlikely(pp2_ppio_inq_desc_get_l2_pkt_error(&descs[i]) != PP2_DESC_ERR_OK)) {
@@ -1247,6 +1248,7 @@ static inline void
 mrvl_free_sent_buffers(struct pp2_ppio *ppio, struct pp2_hif *hif,
 			struct mrvl_shadow_txq *sq, int qid, int force)
 {
+	struct buff_release_entry *entry;
 	uint16_t nb_done = 0, num = 0, skip_bufs = 0;
 	int i;
 
@@ -1260,30 +1262,38 @@ mrvl_free_sent_buffers(struct pp2_ppio *ppio, struct pp2_hif *hif,
 	nb_done = sq->num_to_release;
 	sq->num_to_release = 0;
 
-	for (i = 0, num = 0; i < nb_done; i++) {
-		struct rte_mbuf *mbuf;
+	for (i = 0; i < nb_done; i++) {
+		entry = &sq->ent[sq->tail + num];
+		if (unlikely(!entry->buff.addr)) {
+			RTE_LOG(ERR, PMD,
+				"Shadow memory @%d: cookie(%lx), pa(%lx)!\n",
+				sq->tail, (u64)entry->buff.cookie,
+				(u64)entry->buff.addr);
+			skip_bufs = 1;
+			goto skip;
+		}
 
-		mbuf = (struct rte_mbuf *)(cookie_addr_high | sq->ent[sq->tail + num].buff.cookie);
-		if (unlikely(mbuf->port == 0xff || mbuf->refcnt > 1)) {
+		if (unlikely(!entry->bpool)) {
+			struct rte_mbuf *mbuf;
+
+			mbuf = (struct rte_mbuf *)
+			       (cookie_addr_high | entry->buff.cookie);
 			rte_pktmbuf_free(mbuf);
 			skip_bufs = 1;
 			goto skip;
 		}
-		sq->ent[sq->tail + num].bpool = mrvl_port_to_bpool_lookup[mbuf->port];
-		rte_pktmbuf_reset(mbuf);
-		num++;
 
+		num++;
 		if (unlikely(sq->tail + num == MRVL_PP2_TX_SHADOWQ_SIZE))
 			goto skip;
 		continue;
 skip:
-		if (likely(num)) {
+		if (likely(num))
 			pp2_bpool_put_buffs(hif, &sq->ent[sq->tail], &num);
-			num += skip_bufs;
-			sq->tail = (sq->tail + num) & MRVL_PP2_TX_SHADOWQ_MASK;
-			sq->size -= num;
-			num = 0;
-		}
+		num += skip_bufs;
+		sq->tail = (sq->tail + num) & MRVL_PP2_TX_SHADOWQ_MASK;
+		sq->size -= num;
+		num = 0;
 	}
 
 	if (likely(num)) {
@@ -1313,7 +1323,8 @@ mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 	sq_free_size = MRVL_PP2_TX_SHADOWQ_SIZE - sq->size - 1;
 	if (unlikely(nb_pkts > sq_free_size)) {
 		RTE_LOG(DEBUG, PMD,
-			"No room in shadow queue for %d packets!!! %d packets will be sent.\n",
+			"No room in shadow queue for %d packets!!!"
+			"%d packets will be sent.\n",
 			nb_pkts, sq_free_size);
 		nb_pkts = sq_free_size;
 	}
@@ -1334,6 +1345,9 @@ mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 
 		sq->ent[sq->head].buff.cookie = (pp2_cookie_t)(uint64_t)mbuf;
 		sq->ent[sq->head].buff.addr = rte_mbuf_data_dma_addr_default(mbuf);
+		sq->ent[sq->head].bpool =
+			(unlikely(mbuf->port == 0xff || mbuf->refcnt > 1)) ?
+			 NULL : mrvl_port_to_bpool_lookup[mbuf->port];
 		sq->head = (sq->head + 1) & MRVL_PP2_TX_SHADOWQ_MASK;
 		sq->size++;
 
