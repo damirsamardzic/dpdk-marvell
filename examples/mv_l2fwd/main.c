@@ -542,6 +542,8 @@ parse_args(int argc, char **argv)
 			break;
 		case 'b':
 			burst_size = atoi(optarg);
+			if (burst_size > MAX_PKT_BURST)
+				burst_size = MAX_PKT_BURST;
 			printf("Burst Size: %d\n", burst_size);
 			break;
 
