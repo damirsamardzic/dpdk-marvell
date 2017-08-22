@@ -138,21 +138,9 @@ struct lcore_params {
 } __rte_cache_aligned;
 
 static struct lcore_params lcore_params_array[MAX_LCORE_PARAMS];
-static struct lcore_params lcore_params_array_default[] = {
-	{0, 0, 2},
-	{0, 1, 2},
-	{0, 2, 2},
-	{1, 0, 2},
-	{1, 1, 2},
-	{1, 2, 2},
-	{2, 0, 2},
-	{3, 0, 3},
-	{3, 1, 3},
-};
 
-static struct lcore_params * lcore_params = lcore_params_array_default;
-static uint16_t nb_lcore_params = sizeof(lcore_params_array_default) /
-				sizeof(lcore_params_array_default[0]);
+static struct lcore_params *lcore_params = lcore_params_array;
+static uint16_t nb_lcore_params;
 
 static struct rte_eth_conf port_conf = {
 	.rxmode = {
@@ -238,7 +226,8 @@ check_lcore_params(void)
 		}
 		lcore = lcore_params[i].lcore_id;
 		if (!rte_lcore_is_enabled(lcore)) {
-			printf("error: lcore %hhu is not enabled in lcore mask\n", lcore);
+			printf("error %d (%d): lcore %hhu is not enabled in lcore mask\n",
+				i, nb_lcore_params, lcore);
 			return -1;
 		}
 		if ((socketid = rte_lcore_to_socket_id(lcore) != 0) &&
@@ -288,6 +277,33 @@ get_port_n_rx_queues(const uint8_t port)
 	}
 	return (uint8_t)(++queue);
 }
+
+static int
+set_default_lcore_rx_queues(void)
+{
+	uint16_t i, j, nb_rx_queue = 0;
+
+	for (i = 0; i < MAX_LCORE_PARAMS; ++i) {
+		if (!rte_lcore_is_enabled(i))
+			continue;
+
+		for (j = 0; j < RTE_MAX_ETHPORTS; j++) {
+			if ((enabled_port_mask & (1 << j)) == 0)
+				continue;
+
+			lcore_params_array[nb_lcore_params].port_id = j;
+			lcore_params_array[nb_lcore_params].queue_id =
+								nb_rx_queue;
+			lcore_params_array[nb_lcore_params].lcore_id = i;
+			printf("%d: lcore %d: port: %d, queue: %d\n",
+				nb_lcore_params, i, j, nb_rx_queue);
+			++nb_lcore_params;
+		}
+		nb_rx_queue++;
+	}
+	return 0;
+}
+
 
 static int
 init_lcore_rx_queues(void)
@@ -447,7 +463,6 @@ parse_config(const char *q_arg)
 			(uint8_t)int_fld[FLD_LCORE];
 		++nb_lcore_params;
 	}
-	lcore_params = lcore_params_array;
 	return 0;
 }
 
@@ -675,6 +690,8 @@ parse_args(int argc, char **argv)
 			return -1;
 		}
 	}
+	if (!nb_lcore_params)
+		set_default_lcore_rx_queues();
 
 	/* If both LPM and EM are selected, return error. */
 	if (l3fwd_lpm_on && l3fwd_em_on) {
