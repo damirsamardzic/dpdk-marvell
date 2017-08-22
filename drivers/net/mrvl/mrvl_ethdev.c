@@ -1380,16 +1380,6 @@ mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 			    descs, &nb_pkts);
 	/* number of packets that were not sent */
 	if (unlikely(num > nb_pkts)) {
-#if 1
-		for (i = nb_pkts; i < num; i++) {
- 			addr = cookie_addr_high | pp2_ppio_inq_desc_get_cookie(&descs[i]);
- 			bytes_sent -= rte_pktmbuf_pkt_len((struct rte_mbuf *)addr);
-		}
-		num -= nb_pkts;
-		sq->head = (MRVL_PP2_TX_SHADOWQ_SIZE + sq->head - num) &
-			    MRVL_PP2_TX_SHADOWQ_MASK;
-		sq->size -= num;
-#else
 		for (i = nb_pkts; i < num; i++) {
 			sq->head = (MRVL_PP2_TX_SHADOWQ_SIZE + sq->head - 1) &
 			    	   MRVL_PP2_TX_SHADOWQ_MASK;
@@ -1397,9 +1387,6 @@ mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 			bytes_sent -= rte_pktmbuf_pkt_len((struct rte_mbuf *)addr);
 		}
 		sq->size -= num - nb_pkts;
-
-#endif
-
 	}
 
 	/*
