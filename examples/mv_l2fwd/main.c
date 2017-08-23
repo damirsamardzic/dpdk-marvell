@@ -128,6 +128,10 @@ static struct timeval t1, t2;
 #define	BAD_PORT ((uint16_t)-1)
 
 
+#define ETHER_FRAME_LEN_TO_MTU(length)	\
+	(length - ETHER_HDR_LEN -	\
+	ETHER_CRC_LEN)	/**< Packet size to ethernet MTU. */
+
 /* Static global variables used within this file. */
 static uint16_t nb_rxd = RTE_TEST_RX_DESC_DEFAULT;
 static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
@@ -1009,7 +1013,11 @@ main(int argc, char **argv)
 			rte_eth_promiscuous_enable(portid);
 
 		if (port_conf.rxmode.jumbo_frame)
-			rte_eth_dev_set_mtu(portid, port_conf.rxmode.max_rx_pkt_len);
+			rte_eth_dev_set_mtu(
+				portid,
+				ETHER_FRAME_LEN_TO_MTU(
+				port_conf.rxmode.max_rx_pkt_len)
+				);
 	}
 
 	printf("\n");
