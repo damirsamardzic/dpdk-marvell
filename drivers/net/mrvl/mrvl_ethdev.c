@@ -1194,11 +1194,14 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 		q->bytes_recv += mbuf->pkt_len;
 	}
 
-	pp2_bpool_get_num_buffs(q->priv->bpool, &num);
-	if (unlikely(num <= 2 * MRVL_BURST_SIZE)) {
-		ret = mrvl_fill_bpool(q, MRVL_BURST_SIZE);
-		if (ret)
-			RTE_LOG(ERR, PMD, "Failed to fill bpool\n");
+	if (rte_spinlock_trylock(&q->priv->lock) == 1) {
+		pp2_bpool_get_num_buffs(q->priv->bpool, &num);
+		if (unlikely(num <= 2 * MRVL_BURST_SIZE)) {
+			ret = mrvl_fill_bpool(q, MRVL_BURST_SIZE);
+			if (ret)
+				RTE_LOG(ERR, PMD, "Failed to fill bpool\n");
+		}
+		rte_spinlock_unlock(&q->priv->lock);
 	}
 
 	return rx_done;
@@ -1460,6 +1463,7 @@ mrvl_priv_create(const char *dev_name)
 		goto out_clear_bpool_bit;
 
 	priv->ppio_params.type = PP2_PPIO_T_NIC;
+	rte_spinlock_init(&priv->lock);
 
 	return priv;
 out_clear_bpool_bit:

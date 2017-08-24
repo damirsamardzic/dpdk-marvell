@@ -34,6 +34,7 @@
 #ifndef _MRVL_ETHDEV_H_
 #define _MRVL_ETHDEV_H_
 
+#include <rte_spinlock.h>
 #include <drivers/mv_pp2_cls.h>
 #include <drivers/mv_pp2_ppio.h>
 
@@ -84,6 +85,7 @@ struct mrvl_priv {
 	/* Hot fields, used in fast path. */
 	struct pp2_bpool *bpool; /**< BPool pointer */
 	struct pp2_ppio	*ppio;   /**< Port handler pointer */
+	rte_spinlock_t lock;
 
 	/** Mapping for DPDK rx queue->(TC, MRVL relative inq) */
 	struct {
