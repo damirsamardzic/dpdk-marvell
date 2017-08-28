@@ -39,6 +39,8 @@ endif
 LIB = librte_pmd_mrvl_crypto.a
 
 # build flags
+CFLAGS += -DMVCONF_TYPES_PUBLIC
+CFLAGS += -DMVCONF_DMA_PHYS_ADDR_T_PUBLIC
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)
 

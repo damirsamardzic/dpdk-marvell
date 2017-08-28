@@ -41,7 +41,7 @@
 #ifdef container_of
 #undef container_of
 #endif
-
+#include <env/mv_autogen_comp_flags.h>
 #include <drivers/mv_pp2.h>
 #include <drivers/mv_pp2_bpool.h>
 #include <drivers/mv_pp2_hif.h>
