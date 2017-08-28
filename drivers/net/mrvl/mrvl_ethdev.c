@@ -105,6 +105,7 @@ static int used_bpools[PP2_NUM_PKT_PROC] = {
 };
 
 struct pp2_bpool *mrvl_port_to_bpool_lookup[RTE_MAX_ETHPORTS];
+int mrvl_port_bpool_size[PP2_NUM_PKT_PROC][PP2_BPOOL_NUM_POOLS][RTE_MAX_LCORE];
 uint64_t cookie_addr_high = MRVL_COOKIE_ADDR_INVALID;
 
 /*
@@ -157,6 +158,22 @@ struct mrvl_shadow_txq shadow_txqs[RTE_MAX_ETHPORTS][RTE_MAX_LCORE];
 
 /** Number of ports configured. */
 int mrvl_ports_nb;
+int mrvl_lcore_first;
+int mrvl_lcore_last;
+
+
+static inline int
+mrvl_get_bpool_size(int	pp2_id, int pool_id)
+{
+	int i;
+	int size = 0;
+
+	for (i = mrvl_lcore_first; i <= mrvl_lcore_last; i++)
+		size += mrvl_port_bpool_size[pp2_id][pool_id][i];
+
+	return size;
+}
+
 
 static inline int
 mrvl_reserve_bit(int *bitmap, int max)
@@ -830,7 +847,9 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 	struct buff_release_entry entries[MRVL_PP2_TXD_MAX];
 	struct rte_mbuf *mbufs[MRVL_PP2_TXD_MAX];
 	int i, ret;
-	struct pp2_hif *hif = hifs[rte_lcore_id()];
+	unsigned core_id = rte_lcore_id();
+	struct pp2_hif *hif = hifs[core_id];
+	struct pp2_bpool *bpool = rxq->priv->bpool;
 
 	ret = rte_pktmbuf_alloc_bulk(rxq->mp, mbufs, num);
 	if (ret)
@@ -852,7 +871,7 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 
 		entries[i].buff.addr = rte_mbuf_data_dma_addr_default(mbufs[i]);
 		entries[i].buff.cookie = (pp2_cookie_t)(uint64_t)mbufs[i];
-		entries[i].bpool = rxq->priv->bpool;
+		entries[i].bpool = bpool;
 	}
 
 	ret = pp2_bpool_put_buffs(hif, entries, (uint16_t *)&i);
@@ -862,12 +881,13 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 		ret = -1;
 		goto out;
 	}
+	mrvl_port_bpool_size[bpool->pp2_id][bpool->id][core_id] += num;
 
 	return 0;
 out:
 	for (; i > 0; i--) {
 		struct pp2_buff_inf inf;
-		pp2_bpool_get_buff(hif, rxq->priv->bpool, &inf);
+		pp2_bpool_get_buff(hif, bpool, &inf);
 	}
 out_free:
 	for (i = 0; i < num; i++)
@@ -1133,11 +1153,15 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 {
 	struct mrvl_rxq *q = rxq;
 	struct pp2_ppio_desc descs[nb_pkts];
+	struct pp2_bpool *bpool;
 	int i, ret, rx_done = 0;
-	uint32_t num;
+	int num;
+	unsigned core_id = rte_lcore_id();
 
 	if (unlikely(!q->priv->ppio))
 		return 0;
+
+	bpool = q->priv->bpool;
 
 	ret = pp2_ppio_recv(q->priv->ppio,
 			q->priv->rxq_map[q->queue_id].tc,
@@ -1148,6 +1172,7 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 		RTE_LOG(ERR, PMD, "Failed to receive packets\n");
 		return 0;
 	}
+	mrvl_port_bpool_size[bpool->pp2_id][bpool->id][core_id] -= nb_pkts;
 
 	for (i = 0; i < nb_pkts; i++) {
 		struct rte_mbuf *mbuf;
@@ -1176,7 +1201,9 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 				.cookie = (pp2_cookie_t)(uint64_t)mbuf,
 			};
 
-			pp2_bpool_put_buff(hifs[rte_lcore_id()], q->priv->bpool, &binf);
+			pp2_bpool_put_buff(hifs[core_id], bpool, &binf);
+			mrvl_port_bpool_size
+				[bpool->pp2_id][bpool->id][core_id]++;
 			q->drop_mac++;
 			continue;
 		}
@@ -1198,7 +1225,7 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 	}
 
 	if (rte_spinlock_trylock(&q->priv->lock) == 1) {
-		pp2_bpool_get_num_buffs(q->priv->bpool, &num);
+		num = mrvl_get_bpool_size(bpool->pp2_id, bpool->id);
 		if (unlikely(num <= 2 * MRVL_BURST_SIZE)) {
 			ret = mrvl_fill_bpool(q, MRVL_BURST_SIZE);
 			if (ret)
@@ -1256,7 +1283,7 @@ mrvl_free_sent_buffers(struct pp2_ppio *ppio, struct pp2_hif *hif,
 {
 	struct buff_release_entry *entry;
 	uint16_t nb_done = 0, num = 0, skip_bufs = 0;
-	int i;
+	int i, core_id = rte_lcore_id();
 
 	pp2_ppio_get_num_outq_done(ppio, hif, qid, &nb_done);
 
@@ -1289,6 +1316,8 @@ mrvl_free_sent_buffers(struct pp2_ppio *ppio, struct pp2_hif *hif,
 			goto skip;
 		}
 
+		mrvl_port_bpool_size
+			[entry->bpool->pp2_id][entry->bpool->id][core_id]++;
 		num++;
 		if (unlikely(sq->tail + num == MRVL_PP2_TX_SHADOWQ_SIZE))
 			goto skip;
@@ -1593,13 +1622,22 @@ mrvl_deinit_hifs(void)
 	}
 }
 
+static void mrvl_set_first_last_cores(int core_id)
+{
+	if (core_id < mrvl_lcore_first)
+		mrvl_lcore_first = core_id;
+
+	if (core_id > mrvl_lcore_last)
+		mrvl_lcore_last = core_id;
+}
+
 static int
 rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 {
 	struct rte_kvargs *kvlist;
 	const char *ifnames[PP2_NUM_ETH_PPIO * PP2_NUM_PKT_PROC];
 	int ret = -EINVAL;
-	uint32_t i, ifnum, cfgnum;
+	uint32_t i, ifnum, cfgnum, core_id;
 	const char *name;
 	const char *params;
 
@@ -1656,6 +1694,15 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 	}
 
 	rte_kvargs_free(kvlist);
+
+	memset(mrvl_port_bpool_size, 0, sizeof(mrvl_port_bpool_size));
+
+	mrvl_lcore_first = RTE_MAX_LCORE;
+	mrvl_lcore_last = 0;
+
+	RTE_LCORE_FOREACH(core_id) {
+		mrvl_set_first_last_cores(core_id);
+	}
 
 	return 0;
 out_cleanup:
