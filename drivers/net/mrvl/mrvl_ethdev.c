@@ -153,7 +153,7 @@ struct mrvl_txq {
  * as a workaround define shadow queues for each possible port so that
  * we eventually fit somewhere.
  */
-struct mrvl_shadow_txq shadow_txqs[RTE_MAX_ETHPORTS][MRVL_PP2_TXQ_MAX];
+struct mrvl_shadow_txq shadow_txqs[RTE_MAX_ETHPORTS][RTE_MAX_LCORE];
 
 /** Number of ports configured. */
 int mrvl_ports_nb;
@@ -404,7 +404,7 @@ mrvl_flush_tx_shadow_queues(struct rte_eth_dev *dev)
 	int i;
 
 	RTE_LOG(INFO, PMD, "Flushing tx shadow queues\n");
-	for (i = 0; i < dev->data->nb_tx_queues; i++) {
+	for (i = 0; i < RTE_MAX_LCORE; i++) {
 		struct mrvl_shadow_txq *sq = &shadow_txqs[dev->data->port_id][i];
 
 		while (sq->tail != sq->head) {
@@ -1313,7 +1313,7 @@ static uint16_t
 mrvl_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 {
 	struct mrvl_txq *q = txq;
-	struct mrvl_shadow_txq *sq = &shadow_txqs[q->port_id][q->queue_id];
+	struct mrvl_shadow_txq *sq = &shadow_txqs[q->port_id][rte_lcore_id()];
 	struct pp2_hif* hif = hifs[rte_lcore_id()];
 	struct pp2_ppio_desc descs[nb_pkts];
 	int i, ret, bytes_sent = 0;
