@@ -865,7 +865,6 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 			RTE_LOG(ERR, PMD,
 				"mbuf virtual addr high 0x%lx out of range\n",
 				(uint64_t)mbufs[i] >> 32);
-			ret = -1;
 			goto out;
 		}
 
@@ -874,26 +873,18 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 		entries[i].bpool = bpool;
 	}
 
-	ret = pp2_bpool_put_buffs(hif, entries, (uint16_t *)&i);
-	if (ret)
-		goto out_free;
-	if (i != num) {
-		ret = -1;
+	pp2_bpool_put_buffs(hif, entries, (uint16_t *)&i);
+	mrvl_port_bpool_size[bpool->pp2_id][bpool->id][core_id] += i;
+
+	if (i != num)
 		goto out;
-	}
-	mrvl_port_bpool_size[bpool->pp2_id][bpool->id][core_id] += num;
 
 	return 0;
 out:
-	for (; i > 0; i--) {
-		struct pp2_buff_inf inf;
-		pp2_bpool_get_buff(hif, bpool, &inf);
-	}
-out_free:
-	for (i = 0; i < num; i++)
+	for (; i < num; i++)
 		rte_pktmbuf_free(mbufs[i]);
 
-	return ret;
+	return -1;
 }
 
 static int
