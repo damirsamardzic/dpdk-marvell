@@ -260,6 +260,7 @@ mrvl_dev_configure(struct rte_eth_dev *dev)
 
 	priv->ppio_params.outqs_params.num_outqs = dev->data->nb_tx_queues;
 	priv->ppio_params.maintain_stats = 1;
+	priv->nb_rx_queues = dev->data->nb_rx_queues;
 
 	if (dev->data->nb_rx_queues == 1 &&
 	    dev->data->dev_conf.rxmode.mq_mode == ETH_MQ_RX_RSS) {
@@ -341,6 +342,21 @@ mrvl_dev_start(struct rte_eth_dev *dev)
 
 	snprintf(match, sizeof(match), "ppio-%d:%d", priv->pp_id, priv->ppio_id);
 	priv->ppio_params.match = match;
+
+	/*
+	 * Calculate the maximum bpool size for refill feature to 1.5 of the
+	 * configured size. In case the bpool size will exceed this value,
+	 * superfluous buffers will be removed
+	 */
+	priv->bpool_max_size = priv->bpool_init_size +
+			      (priv->bpool_init_size >> 1);
+	/*
+	 * Calculate the minimum bpool size for refill feature as follows:
+	 * 2 default burst sizes multiply by number of rx queues.
+	 * If the bpool size will be below this value, new buffers will
+	 * be added to the pool.
+	 */
+	priv->bpool_min_size = priv->nb_rx_queues * MRVL_BURST_SIZE * 2;
 
 	ret = pp2_ppio_init(&priv->ppio_params, &priv->ppio);
 	if (ret)
@@ -937,6 +953,8 @@ mrvl_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
 		return ret;
 	}
 
+	priv->bpool_init_size += desc;
+
 	dev->data->rx_queues[idx] = rxq;
 
 	return 0;
@@ -1217,10 +1235,33 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 
 	if (rte_spinlock_trylock(&q->priv->lock) == 1) {
 		num = mrvl_get_bpool_size(bpool->pp2_id, bpool->id);
-		if (unlikely(num <= 2 * MRVL_BURST_SIZE)) {
+
+		if (unlikely((num <= q->priv->bpool_min_size) ||
+			 (!rx_done && (num < q->priv->bpool_init_size)))) {
 			ret = mrvl_fill_bpool(q, MRVL_BURST_SIZE);
 			if (ret)
 				RTE_LOG(ERR, PMD, "Failed to fill bpool\n");
+		} else if (unlikely(num > q->priv->bpool_max_size)) {
+			int i;
+			int pkt_to_remove = num - q->priv->bpool_init_size;
+			struct rte_mbuf *mbuf;
+			struct pp2_buff_inf buff;
+
+			RTE_LOG(INFO, PMD, "\nport-%d:%d: bpool %d oversize -"
+				" remove %d buffers (pool size: %d -> %d)\n",
+				bpool->pp2_id, q->priv->ppio->port_id,
+				bpool->id, pkt_to_remove, num,
+				q->priv->bpool_init_size);
+
+			for (i = 0; i < pkt_to_remove; i++) {
+				pp2_bpool_get_buff(hifs[core_id], bpool, &buff);
+				mbuf = (struct rte_mbuf *)
+					(cookie_addr_high | buff.cookie);
+				rte_pktmbuf_free(mbuf);
+			}
+			mrvl_port_bpool_size
+				[bpool->pp2_id][bpool->id][core_id] -=
+								pkt_to_remove;
 		}
 		rte_spinlock_unlock(&q->priv->lock);
 	}

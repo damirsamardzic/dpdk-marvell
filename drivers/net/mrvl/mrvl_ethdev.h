@@ -84,9 +84,12 @@
 
 struct mrvl_priv {
 	/* Hot fields, used in fast path. */
-	struct pp2_bpool *bpool; /**< BPool pointer */
-	struct pp2_ppio	*ppio;   /**< Port handler pointer */
-	rte_spinlock_t lock;
+	struct pp2_bpool *bpool;  /**< BPool pointer */
+	struct pp2_ppio	*ppio;    /**< Port handler pointer */
+	rte_spinlock_t lock;	  /**< Spinlock for checking bpool status */
+	uint16_t bpool_max_size;  /**< BPool maximum size */
+	uint16_t bpool_min_size;  /**< BPool minimum size  */
+	uint16_t bpool_init_size; /**< Configured BPool size  */
 
 	/** Mapping for DPDK rx queue->(TC, MRVL relative inq) */
 	struct {
@@ -105,6 +108,7 @@ struct mrvl_priv {
 	struct pp2_ppio_params ppio_params;
 	struct pp2_cls_qos_tbl_params qos_tbl_params;
 	struct pp2_cls_tbl *qos_tbl;
+	uint16_t nb_rx_queues;
 };
 
 /** Number of ports configured. */
