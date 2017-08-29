@@ -48,7 +48,4 @@
 #include "drivers/mv_sam_cio.h"
 #include "drivers/mv_sam_session.h"
 
-/* Moved from (inaccessible) src/drivers/sam/sam.h */
-#define SAM_HW_RING_SIZE       256
-
 #endif /* RTE_MRVL_COMPAT_H_ */

@@ -602,8 +602,7 @@ mrvl_crypto_pmd_qp_setup(struct rte_cryptodev *dev, uint16_t qp_id,
 {
 	struct mrvl_crypto_qp *qp = NULL;
 	unsigned int n;
-	uint32_t descriptors = (qp_conf->nb_descriptors > SAM_HW_RING_SIZE) ?
-			SAM_HW_RING_SIZE : qp_conf->nb_descriptors;
+	uint32_t descriptors = qp_conf->nb_descriptors;
 
 	/* Allocate the queue pair data structure. */
 	qp = rte_zmalloc_socket("MRVL Crypto PMD Queue Pair", sizeof(*qp),
@@ -620,15 +619,15 @@ mrvl_crypto_pmd_qp_setup(struct rte_cryptodev *dev, uint16_t qp_id,
 
 		/*
 		 * Following cio-hw_engine:hw_ring match strings are available:
-		 * cio-0:0, cio-0:1, cio-0:2, cio-0:3,
-		 * cio-1:0, cio-1:1, cio-1:2, cio-1:3
+		 *    0        1        2        3        4        5        6        7
+		 * cio-0:0, cio-1:0, cio-0:1, cio-1:1, cio-0:2, cio-1:2, cio-0:3, cio-1:3
 		 *
 		 * In case two hw engines are available qp with ids 4,5,6,7
 		 * will be handled by the second engine.
 		 */
 		n = snprintf(qp->name, sizeof(qp->name), "cio-%u:%u",
-			     qp->id >= SAM_HW_RING_NUM,
-			     qp->id % SAM_HW_RING_NUM);
+			     qp->id % sam_get_num_inst(),
+			     qp->id / sam_get_num_inst());
 
 		if (n >= sizeof(qp->name))
 			break;
