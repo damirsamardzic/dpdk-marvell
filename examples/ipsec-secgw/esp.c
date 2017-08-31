@@ -86,8 +86,7 @@ esp_inbound(struct rte_mbuf *m, struct ipsec_sa *sa,
 	sym_cop = get_sym_cop(cop);
 
 	sym_cop->m_src = m;
-	sym_cop->cipher.data.offset =  ip_hdr_len + sizeof(struct esp_hdr) +
-		sa->iv_len;
+	sym_cop->cipher.data.offset = ip_hdr_len + sizeof(struct esp_hdr) + sa->iv_len;
 	sym_cop->cipher.data.length = payload_len;
 
 	struct cnt_blk *icb;
@@ -169,7 +168,7 @@ esp_inbound_post(struct rte_mbuf *m, struct ipsec_sa *sa,
 	RTE_ASSERT(cop != NULL);
 
 	if (cop->status != RTE_CRYPTO_OP_STATUS_SUCCESS) {
-		RTE_LOG(ERR, IPSEC_ESP, "failed crypto op\n");
+		RTE_LOG(ERR, IPSEC_ESP, "failed inbound crypto op: status = %d\n", cop->status);
 		return -1;
 	}
 
@@ -324,8 +323,8 @@ esp_outbound(struct rte_mbuf *m, struct ipsec_sa *sa,
 	case RTE_CRYPTO_CIPHER_AES_CBC:
 		memset(iv, 0, sa->iv_len);
 		sym_cop->cipher.data.offset = ip_hdr_len +
-			sizeof(struct esp_hdr);
-		sym_cop->cipher.data.length = pad_payload_len + sa->iv_len;
+			sizeof(struct esp_hdr) + sa->iv_len;
+		sym_cop->cipher.data.length = pad_payload_len;
 		break;
 	case RTE_CRYPTO_CIPHER_AES_CTR:
 	case RTE_CRYPTO_CIPHER_AES_GCM:
@@ -354,6 +353,7 @@ esp_outbound(struct rte_mbuf *m, struct ipsec_sa *sa,
 	sym_cop->cipher.iv.phys_addr = rte_pktmbuf_mtophys_offset(m,
 			 (uint8_t *)icb - rte_pktmbuf_mtod(m, uint8_t *));
 	sym_cop->cipher.iv.length = 16;
+	memcpy(iv, sym_cop->cipher.iv.data, sym_cop->cipher.iv.length);
 
 	uint8_t *aad;
 
@@ -402,7 +402,7 @@ esp_outbound_post(struct rte_mbuf *m __rte_unused,
 	RTE_ASSERT(cop != NULL);
 
 	if (cop->status != RTE_CRYPTO_OP_STATUS_SUCCESS) {
-		RTE_LOG(ERR, IPSEC_ESP, "Failed crypto op\n");
+		RTE_LOG(ERR, IPSEC_ESP, "Failed outbound crypto op: status = %d\n", cop->status);
 		return -1;
 	}
 
