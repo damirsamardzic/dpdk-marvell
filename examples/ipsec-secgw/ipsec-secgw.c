@@ -82,7 +82,7 @@
 
 #define NB_MBUF	(32000)
 
-#define CDEV_QUEUE_DESC 2048
+#define CDEV_QUEUE_DESC 256
 #define CDEV_MAP_ENTRIES 1024
 #define CDEV_MP_NB_OBJS 2048
 #define CDEV_MP_CACHE_SZ 64
@@ -107,8 +107,8 @@
 /*
  * Configurable number of RX/TX ring descriptors
  */
-#define IPSEC_SECGW_RX_DESC_DEFAULT 128
-#define IPSEC_SECGW_TX_DESC_DEFAULT 512
+#define IPSEC_SECGW_RX_DESC_DEFAULT 1024
+#define IPSEC_SECGW_TX_DESC_DEFAULT 2048
 static uint16_t nb_rxd = IPSEC_SECGW_RX_DESC_DEFAULT;
 static uint16_t nb_txd = IPSEC_SECGW_TX_DESC_DEFAULT;
 
