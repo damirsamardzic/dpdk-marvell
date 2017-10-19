@@ -1247,7 +1247,7 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 			struct rte_mbuf *mbuf;
 			struct pp2_buff_inf buff;
 
-			RTE_LOG(INFO, PMD, "\nport-%d:%d: bpool %d oversize -"
+			RTE_LOG(DEBUG, PMD, "\nport-%d:%d: bpool %d oversize -"
 				" remove %d buffers (pool size: %d -> %d)\n",
 				bpool->pp2_id, q->priv->ppio->port_id,
 				bpool->id, pkt_to_remove, num,
