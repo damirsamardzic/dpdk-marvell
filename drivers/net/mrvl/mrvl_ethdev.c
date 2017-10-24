@@ -159,6 +159,8 @@ int mrvl_ports_nb;
 int mrvl_lcore_first;
 int mrvl_lcore_last;
 
+int mrvl_dev_num;
+
 
 static inline int
 mrvl_get_bpool_size(int	pp2_id, int pool_id)
@@ -1681,6 +1683,8 @@ mrvl_eth_dev_create(const char *drv_name, const char *name)
 
 	eth_dev->rx_pkt_burst = mrvl_rx_pkt_burst;
 	eth_dev->tx_pkt_burst = mrvl_tx_pkt_burst;
+	eth_dev->data->dev_flags |= RTE_ETH_DEV_DETACHABLE;
+	eth_dev->data->kdrv = RTE_KDRV_NONE;
 	eth_dev->data->drv_name = drv_name;
 	eth_dev->data->dev_private = priv;
 	eth_dev->dev_ops = &mrvl_ops;
@@ -1758,6 +1762,7 @@ mrvl_deinit_hifs(void)
 		if (hifs[i])
 			pp2_hif_deinit(hifs[i]);
 	}
+	used_hifs = MRVL_MUSDK_HIFS_RESERVED;
 }
 
 static void mrvl_set_first_last_cores(int core_id)
@@ -1795,9 +1800,11 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 	if (ifnum > RTE_DIM(ifnames))
 		goto out_free_kvlist;
 
+	mrvl_ports_nb = 0;
 	rte_kvargs_process(kvlist, MRVL_IFACE_NAME_ARG,
 			   mrvl_get_ifnames, &ifnames);
 
+/* TODO:  Get protection for multiple calls */
 	cfgnum = rte_kvargs_count(kvlist, MRVL_CFG_ARG);
 	if (cfgnum > 1) {
 		RTE_LOG(ERR, PMD, "Cannot handle more than one config file!\n");
@@ -1806,23 +1813,28 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 		rte_kvargs_process(kvlist, MRVL_CFG_ARG,
 				mrvl_get_qoscfg, &mrvl_qos_cfg);
 
-	/*
-	 * ret == -EEXIST is correct, it means DMA
-	 * has been already initialized (by another PMD).
-	 */
-	ret = mv_sys_dma_mem_init(RTE_MRVL_MUSDK_DMA_MEMSIZE);
-	if ((ret < 0) && (ret != -EEXIST))
-		goto out_free_kvlist;
+	if (mrvl_dev_num == 0) {
+		RTE_LOG(INFO, PMD,
+			"rte_pmd_mrvl_probe: Perform MUSDK initializations\n");
 
-	ret = mrvl_init_pp2();
-	if (ret) {
-		RTE_LOG(ERR, PMD, "Failed to init PP!\n");
-		goto out_deinit_dma;
+		/*
+		 * ret == -EEXIST is correct, it means DMA
+		 * has been already initialized (by another PMD).
+		 */
+		ret = mv_sys_dma_mem_init(RTE_MRVL_MUSDK_DMA_MEMSIZE);
+		if ((ret < 0) && (ret != -EEXIST))
+			goto out_free_kvlist;
+
+		ret = mrvl_init_pp2();
+		if (ret) {
+			RTE_LOG(ERR, PMD, "Failed to init PP!\n");
+			goto out_deinit_dma;
+		}
+
+		ret = mrvl_init_hifs();
+		if (ret)
+			goto out_deinit_hifs;
 	}
-
-	ret = mrvl_init_hifs();
-	if (ret)
-		goto out_deinit_hifs;
 
 	for (i = 0; i < ifnum; i++) {
 		RTE_LOG(INFO, PMD, "Creating %s\n", ifnames[i]);
@@ -1830,6 +1842,7 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 		if (ret)
 			goto out_cleanup;
 	}
+	mrvl_dev_num += ifnum;
 
 	rte_kvargs_free(kvlist);
 
@@ -1847,10 +1860,13 @@ out_cleanup:
 	for (; i > 0; i--)
 		mrvl_eth_dev_destroy(ifnames[i]);
 out_deinit_hifs:
-	mrvl_deinit_hifs();
-	mrvl_deinit_pp2();
+	if (mrvl_dev_num == 0) {
+		mrvl_deinit_hifs();
+		mrvl_deinit_pp2();
+	}
 out_deinit_dma:
-	mv_sys_dma_mem_destroy();
+	if (mrvl_dev_num == 0)
+		mv_sys_dma_mem_destroy();
 out_free_kvlist:
 	rte_kvargs_free(kvlist);
 
@@ -1863,22 +1879,28 @@ rte_pmd_mrvl_remove(struct rte_vdev_device *vdev)
 	int i;
 	const char *name;
 
+	RTE_LOG(INFO, PMD, "rte_pmd_mrvl_remove: removing %s\n",
+		vdev->device.name);
+
 	name = rte_vdev_device_name(vdev);
 	if (!name)
 		return -EINVAL;
-
-	RTE_LOG(INFO, PMD, "Removing %s\n", name);
 
 	for (i = 0; i < rte_eth_dev_count(); i++) {
 		char ifname[RTE_ETH_NAME_MAX_LEN];
 
 		rte_eth_dev_get_name_by_port(i, ifname);
 		mrvl_eth_dev_destroy(ifname);
+		mrvl_dev_num--;
 	}
 
-	mrvl_deinit_hifs();
-	mrvl_deinit_pp2();
-	mv_sys_dma_mem_destroy();
+	if (mrvl_dev_num == 0) {
+		RTE_LOG(INFO, PMD,
+			"rte_pmd_mrvl_remove: Perform MUSDK deinit\n");
+		mrvl_deinit_hifs();
+		mrvl_deinit_pp2();
+		mv_sys_dma_mem_destroy();
+	}
 
 	return 0;
 }
