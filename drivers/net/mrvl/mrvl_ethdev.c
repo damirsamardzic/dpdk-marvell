@@ -675,6 +675,10 @@ mrvl_flush_bpool(struct rte_eth_dev *dev)
 	struct mrvl_priv *priv = dev->data->dev_private;
 	uint32_t num;
 	int ret;
+	unsigned int core_id = rte_lcore_id();
+
+	if (core_id == LCORE_ID_ANY)
+		core_id = 0;
 
 	ret = pp2_bpool_get_num_buffs(priv->bpool, &num);
 	if (ret) {
@@ -686,7 +690,7 @@ mrvl_flush_bpool(struct rte_eth_dev *dev)
 		struct pp2_buff_inf inf;
 		uint64_t addr;
 
-		ret = pp2_bpool_get_buff(hifs[rte_lcore_id()], priv->bpool, &inf);
+		ret = pp2_bpool_get_buff(hifs[core_id], priv->bpool, &inf);
 		if (ret)
 			break;
 
@@ -971,9 +975,16 @@ mrvl_fill_bpool(struct mrvl_rxq *rxq, int num)
 	struct buff_release_entry entries[MRVL_PP2_TXD_MAX];
 	struct rte_mbuf *mbufs[MRVL_PP2_TXD_MAX];
 	int i, ret;
-	unsigned core_id = rte_lcore_id();
-	struct pp2_hif *hif = hifs[core_id];
-	struct pp2_bpool *bpool = rxq->priv->bpool;
+	unsigned int core_id;
+	struct pp2_hif *hif;
+	struct pp2_bpool *bpool;
+
+	core_id = rte_lcore_id();
+	if (core_id == LCORE_ID_ANY)
+		core_id = 0;
+
+	hif = hifs[core_id];
+	bpool = rxq->priv->bpool;
 
 	ret = rte_pktmbuf_alloc_bulk(rxq->mp, mbufs, num);
 	if (ret)
@@ -1073,6 +1084,10 @@ mrvl_rx_queue_release(void *rxq)
 {
 	struct mrvl_rxq *q = rxq;
 	int i, num;
+	unsigned int core_id = rte_lcore_id();
+
+	if (core_id == LCORE_ID_ANY)
+		core_id = 0;
 
 	if (!q)
 		return;
@@ -1084,7 +1099,7 @@ mrvl_rx_queue_release(void *rxq)
 		struct pp2_buff_inf inf;
 		uint64_t addr;
 
-		pp2_bpool_get_buff(hifs[rte_lcore_id()], q->priv->bpool, &inf);
+		pp2_bpool_get_buff(hifs[core_id], q->priv->bpool, &inf);
 		addr = cookie_addr_high | inf.cookie;
 		rte_pktmbuf_free((struct rte_mbuf *)addr);
 	}
