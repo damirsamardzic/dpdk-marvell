@@ -320,8 +320,10 @@ mrvl_dev_set_link_up(struct rte_eth_dev *dev)
 	 * Set mtu to default DPDK value here.
 	 */
 	ret = mrvl_mtu_set(dev, dev->data->mtu);
-	if (ret)
+	if (ret) {
 		pp2_ppio_disable(priv->ppio);
+		return ret;
+	}
 
 	dev->data->dev_link.link_status = ETH_LINK_UP;
 
@@ -520,6 +522,9 @@ mrvl_dev_start(struct rte_eth_dev *dev)
 	char match[MRVL_MATCH_LEN];
 	int ret = 0, i;
 
+	if (priv->ppio)
+		return mrvl_dev_set_link_up(dev);
+
 	snprintf(match, sizeof(match), "ppio-%d:%d", priv->pp_id, priv->ppio_id);
 	priv->ppio_params.match = match;
 
@@ -702,15 +707,7 @@ mrvl_flush_bpool(struct rte_eth_dev *dev)
 static void
 mrvl_dev_stop(struct rte_eth_dev *dev)
 {
-	struct mrvl_priv *priv = dev->data->dev_private;
-
 	mrvl_dev_set_link_down(dev);
-	mrvl_flush_rx_queues(dev);
-	mrvl_flush_tx_shadow_queues(dev);
-	if (priv->qos_tbl)
-		pp2_cls_qos_tbl_deinit(priv->qos_tbl);
-	pp2_ppio_deinit(priv->ppio);
-	priv->ppio = NULL;
 }
 
 static void
@@ -718,6 +715,9 @@ mrvl_dev_close(struct rte_eth_dev *dev)
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
 	size_t i;
+
+	mrvl_flush_rx_queues(dev);
+	mrvl_flush_tx_shadow_queues(dev);
 
 	for (i = 0; i < priv->ppio_params.inqs_params.num_tcs; ++i)
 		if (priv->ppio_params.inqs_params.tcs_params[i].inqs_params) {
@@ -728,7 +728,13 @@ mrvl_dev_close(struct rte_eth_dev *dev)
 				tcs_params[i].inqs_params = NULL;
 		}
 
+	if (priv->qos_tbl)
+		pp2_cls_qos_tbl_deinit(priv->qos_tbl);
+
 	mrvl_flush_bpool(dev);
+	pp2_ppio_deinit(priv->ppio);
+
+	priv->ppio = NULL;
 }
 
 static int
@@ -1859,6 +1865,11 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 		ret = mrvl_init_hifs();
 		if (ret)
 			goto out_deinit_hifs;
+
+		memset(mrvl_port_bpool_size, 0, sizeof(mrvl_port_bpool_size));
+
+		mrvl_lcore_first = RTE_MAX_LCORE;
+		mrvl_lcore_last = 0;
 	}
 
 	for (i = 0; i < ifnum; i++) {
@@ -1870,11 +1881,6 @@ rte_pmd_mrvl_probe(struct rte_vdev_device *vdev)
 	mrvl_dev_num += ifnum;
 
 	rte_kvargs_free(kvlist);
-
-	memset(mrvl_port_bpool_size, 0, sizeof(mrvl_port_bpool_size));
-
-	mrvl_lcore_first = RTE_MAX_LCORE;
-	mrvl_lcore_last = 0;
 
 	RTE_LCORE_FOREACH(core_id) {
 		mrvl_set_first_last_cores(core_id);
