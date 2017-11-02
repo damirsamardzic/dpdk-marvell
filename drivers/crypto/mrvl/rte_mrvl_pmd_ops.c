@@ -1,6 +1,7 @@
-/*
+/*-
  *   BSD LICENSE
  *
+ *   Copyright(c) 2015-2016 Intel Corporation. All rights reserved.
  *   Copyright (C) Semihalf 2017.
  *
  *   Redistribution and use in source and binary forms, with or without
