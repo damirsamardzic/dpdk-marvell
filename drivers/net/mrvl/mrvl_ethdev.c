@@ -1459,14 +1459,15 @@ mrvl_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 				q->priv->bpool_init_size);
 
 			for (i = 0; i < pkt_to_remove; i++) {
-				pp2_bpool_get_buff(hif, bpool, &buff);
+				ret = pp2_bpool_get_buff(hif, bpool, &buff);
+				if (ret)
+					break;
 				mbuf = (struct rte_mbuf *)
 					(cookie_addr_high | buff.cookie);
 				rte_pktmbuf_free(mbuf);
 			}
 			mrvl_port_bpool_size
-				[bpool->pp2_id][bpool->id][core_id] -=
-								pkt_to_remove;
+				[bpool->pp2_id][bpool->id][core_id] -= i;
 		}
 		rte_spinlock_unlock(&q->priv->lock);
 	}
