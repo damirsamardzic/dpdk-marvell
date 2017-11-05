@@ -161,6 +161,7 @@ int mrvl_lcore_last;
 
 int mrvl_dev_num;
 
+static int mrvl_fill_bpool(struct mrvl_rxq *rxq, int num);
 
 static inline int
 mrvl_get_bpool_size(int	pp2_id, int pool_id)
@@ -574,7 +575,7 @@ mrvl_dev_start(struct rte_eth_dev *dev)
 {
 	struct mrvl_priv *priv = dev->data->dev_private;
 	char match[MRVL_MATCH_LEN];
-	int ret = 0, i;
+	int ret = 0, i, def_init_size;
 
 	if (priv->ppio)
 		return mrvl_dev_set_link_up(dev);
@@ -583,19 +584,35 @@ mrvl_dev_start(struct rte_eth_dev *dev)
 	priv->ppio_params.match = match;
 
 	/*
-	 * Calculate the maximum bpool size for refill feature to 1.5 of the
-	 * configured size. In case the bpool size will exceed this value,
-	 * superfluous buffers will be removed
-	 */
-	priv->bpool_max_size = priv->bpool_init_size +
-			      (priv->bpool_init_size >> 1);
-	/*
 	 * Calculate the minimum bpool size for refill feature as follows:
 	 * 2 default burst sizes multiply by number of rx queues.
 	 * If the bpool size will be below this value, new buffers will
 	 * be added to the pool.
 	 */
 	priv->bpool_min_size = priv->nb_rx_queues * MRVL_BURST_SIZE * 2;
+
+	/* In case initial bpool size configured in queues setup is
+	 * smaller than minimum size add more buffers
+	 */
+	def_init_size = priv->bpool_min_size + MRVL_BURST_SIZE * 2;
+	if (priv->bpool_init_size < def_init_size) {
+		int buffs_to_add = def_init_size - priv->bpool_init_size;
+
+		priv->bpool_init_size += buffs_to_add;
+		ret = mrvl_fill_bpool(dev->data->rx_queues[0], buffs_to_add);
+		if (ret)
+			RTE_LOG(ERR, PMD, "Failed to add buffers to bpool\n");
+	}
+
+	/*
+	 * Calculate the maximum bpool size for refill feature as follows:
+	 * maximum number of descriptors in rx queue multiply by number
+	 * of rx queues plus minimum bpool size.
+	 * In case the bpool size will exceed this value, superfluous buffers
+	 * will be removed
+	 */
+	priv->bpool_max_size = (priv->nb_rx_queues * MRVL_PP2_RXD_MAX) +
+				priv->bpool_min_size;
 
 	ret = pp2_ppio_init(&priv->ppio_params, &priv->ppio);
 	if (ret) {
