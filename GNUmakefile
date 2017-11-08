@@ -39,6 +39,8 @@ export RTE_SDK
 LIBMUSDK_PATH := /usr
 export LIBMUSDK_PATH
 
+DEB_BUILD_OPTIONS += nostatic
+
 #
 # directory list
 #
