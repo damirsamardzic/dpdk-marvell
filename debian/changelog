@@ -1,3 +1,9 @@
+dpdk (17.05.1710-0ubuntu2) xenial; urgency=medium
+
+  * add musdk dependency
+
+ -- Damir Samardzic <damirsamardzic@yahoo.com>  Wed, 08 Nov 2017 11:37:35 +0000
+
 dpdk (17.05.1710-0ubuntu1) xenial; urgency=medium
 
   * initial: dpdk with musdk

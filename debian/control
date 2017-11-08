@@ -19,7 +19,8 @@ Build-Depends: debhelper (>= 9),
                python-sphinx <!nodoc>,
                python-sphinx-rtd-theme <!nodoc>,
                texlive-fonts-recommended <!nodoc>,
-               texlive-latex-extra <!nodoc>
+               texlive-latex-extra <!nodoc>,
+               musdk
 Standards-Version: 4.1.0
 Section: libs
 Homepage: http://www.dpdk.org
