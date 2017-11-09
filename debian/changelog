@@ -1,3 +1,9 @@
+dpdk (17.05.1710-0ubuntu7) xenial; urgency=medium
+
+  * remove nostatic, keep RTE_BUILD_SHARED_LIB=n
+
+ -- Damir Samardzic <damirsamardzic@yahoo.com>  Thu, 09 Nov 2017 10:01:56 +0000
+
 dpdk (17.05.1710-0ubuntu6) xenial; urgency=medium
 
   * remove j1, DEB_BUILD_OPTIONS in rules
