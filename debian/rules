@@ -271,8 +271,6 @@ endif
 	# Package: libdpdk-dev (bare headers, static devel libs and linker
 	# script)
 	mkdir -p debian/libdpdk-dev/$(LIBDIR)
-	# linker script
-	mv debian/dpdk/$(LIBDIR)/libdpdk.so debian/libdpdk-dev/$(LIBDIR)/
 	# includes
 	# Some headers have architecture-specific content, but the upstream build
 	# system installs them in the same directory, breaking multiarch.
