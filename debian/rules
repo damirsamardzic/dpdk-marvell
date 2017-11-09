@@ -307,7 +307,6 @@ endif
 	# symlinks to last .so's are in the non versioned libdpdk-dev as well
 	# this allows multiple libdpdk-<NAME><VER> at different VER concurrently
 	# libdpdk-dev depends on all sublibs so symlinks are never broken
-	mv debian/dpdk/$(LIBDIR)/*.so debian/libdpdk-dev/$(LIBDIR)/
 	# Package(s): libdpdk-<NAME><VER> (bare runtime libs)
 	for lib in $$(ls -1 debian/dpdk/$(LIBDIR)/*.so.*); do \
 	  BN=$$(basename $${lib}); \
