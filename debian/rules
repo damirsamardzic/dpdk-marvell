@@ -186,7 +186,6 @@ ifeq (,$(filter dpdk_config=%,$(DEB_BUILD_OPTIONS)))
 		-e 's,(CONFIG_RTE_KNI_KMOD=).*,\1$(DPDK_CONFIG_BUILD_KMOD),' \
 		-e 's,(LIBRTE_PMD_PCAP=).*,\1y,' \
 		-e 's,(LIBRTE_PMD_XENVIRT=).*,\1y,' \
-		-e 's,(CONFIG_RTE_EAL_PMD_PATH=).*,\1"/usr/lib/$(DEB_HOST_MULTIARCH)/dpdk-pmds/",' \
 		$(DPDK_STATIC_DIR)/.config
 	# xen not available on ppc64el
 ifneq (,$(filter $(DEB_HOST_ARCH), ppc64el))
@@ -230,6 +229,7 @@ ifeq (y,$(BUILD_DOCS))
 	$(MAKE) V=$(DH_VERBOSE) O=$(DPDK_SHARED_DIR) RTE_KERNELDIR=$(KSRC) doc-guides-man
 endif
 	$(MAKE) V=$(DH_VERBOSE) O=$(DPDK_SHARED_DIR) RTE_KERNELDIR=$(KSRC) test-build
+	$(MAKE) V=$(DH_VERBOSE) O=$(DPDK_SHARED_DIR) RTE_KERNELDIR=$(KSRC) T=$(DPDK_CONFIG) examples
 
 override_dh_auto_install-arch: LIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH)
 override_dh_auto_install-arch:
