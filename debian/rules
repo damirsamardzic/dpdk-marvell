@@ -229,6 +229,7 @@ ifeq (y,$(BUILD_DOCS))
 	$(MAKE) V=$(DH_VERBOSE) O=$(DPDK_SHARED_DIR) RTE_KERNELDIR=$(KSRC) doc-guides-man
 endif
 	$(MAKE) V=$(DH_VERBOSE) O=$(DPDK_SHARED_DIR) RTE_KERNELDIR=$(KSRC) test-build
+	ln -s $(DPDK_SHARED_DIR) $(DPDK_CONFIG)
 	$(MAKE) V=$(DH_VERBOSE) O=$(DPDK_SHARED_DIR) RTE_KERNELDIR=$(KSRC) T=$(DPDK_CONFIG) examples
 
 override_dh_auto_install-arch: LIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH)
