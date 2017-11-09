@@ -77,7 +77,7 @@ DPDK_SHARED_DIR = "debian/build/shared-root"
 # now stable with parallel comilation, so support -j
 ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
     PAR := $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
-    MAKEFLAGS += -j$(PAR)
+    MAKEFLAGS += -j1
 endif
 
 ifneq (,$(findstring nodoc,$(DEB_BUILD_OPTIONS)))

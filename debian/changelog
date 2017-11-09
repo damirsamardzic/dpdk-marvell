@@ -1,3 +1,9 @@
+dpdk (17.05.1710-0ubuntu5) xenial; urgency=medium
+
+  * force j1
+
+ -- Damir Samardzic <damirsamardzic@yahoo.com>  Thu, 09 Nov 2017 08:04:22 +0000
+
 dpdk (17.05.1710-0ubuntu4) xenial; urgency=medium
 
   * changed DEB_BUILD_OPTIONS
