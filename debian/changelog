@@ -1,3 +1,9 @@
+dpdk (17.05.1710-0ubuntu12) xenial; urgency=medium
+
+  * add examples to dpdk-dev
+
+ -- Damir Samardzic <damirsamardzic@yahoo.com>  Fri, 10 Nov 2017 07:23:50 +0000
+
 dpdk (17.05.1710-0ubuntu11) xenial; urgency=medium
 
   * update examples

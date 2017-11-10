@@ -230,7 +230,7 @@ ifeq (y,$(BUILD_DOCS))
 endif
 	$(MAKE) V=$(DH_VERBOSE) O=$(DPDK_SHARED_DIR) RTE_KERNELDIR=$(KSRC) test-build
 	ln -s $(DPDK_SHARED_DIR) $(DPDK_CONFIG)
-	$(MAKE) V=$(DH_VERBOSE) O=$(DPDK_SHARED_DIR) RTE_KERNELDIR=$(KSRC) T=$(DPDK_CONFIG) examples
+	$(MAKE) V=$(DH_VERBOSE) O=$(DPDK_SHARED_DIR)/examples RTE_KERNELDIR=$(KSRC) T=$(DPDK_CONFIG) examples
 
 override_dh_auto_install-arch: LIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH)
 override_dh_auto_install-arch:
@@ -265,6 +265,8 @@ endif
 		cp $(DPDK_SHARED_DIR)/app/testacl debian/dpdk-dev/usr/share/dpdk/test/; \
 		cp $(DPDK_SHARED_DIR)/app/testpipeline debian/dpdk-dev/usr/share/dpdk/test/; \
 	fi
+	# add examples to dev package
+	cp -a $(DPDK_SHARED_DIR)/examples debian/dpdk-dev/usr/share/dpdk/
 	# since we move libs to multiarch dirs update the non aware symlink
 	rm debian/dpdk-dev/usr/share/dpdk/$(RTE_TARGET)/lib
 	ln -rs debian/dpdk-dev/$(LIBDIR)/ \
