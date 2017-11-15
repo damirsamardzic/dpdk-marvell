@@ -267,6 +267,9 @@ endif
 	fi
 	# add examples to dev package
 	cp -a $(DPDK_SHARED_DIR)/examples debian/dpdk-dev/usr/share/dpdk/
+	# copy examples apps to /usr/local/bin
+	mkdir -p debian/dpdk-dev/usr/local/bin
+	cp -a $(DPDK_SHARED_DIR)/examples/*/*/app/* debian/dpdk-dev/usr/local/bin/
 	# since we move libs to multiarch dirs update the non aware symlink
 	rm debian/dpdk-dev/usr/share/dpdk/$(RTE_TARGET)/lib
 	ln -rs debian/dpdk-dev/$(LIBDIR)/ \

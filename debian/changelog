@@ -1,3 +1,9 @@
+dpdk (17.05.1710-0ubuntu13) xenial; urgency=medium
+
+  * copy examples apps to dpdk-dev under /usr/local/bin
+
+ -- Damir Samardzic <damirsamardzic@yahoo.com>  Wed, 15 Nov 2017 22:23:24 +0000
+
 dpdk (17.05.1710-0ubuntu12) xenial; urgency=medium
 
   * add examples to dpdk-dev
